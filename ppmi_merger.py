@@ -19,7 +19,7 @@ Weston Brain Institute.
 
 Instructions:
   0. Download all of the PPMI CSV files into a single folder: 
-     `PPMI_csv_path` (define yourselfbelow)
+     `PPMI_csv_path` (define yourself below)
   
   Set some variable names
 """
@@ -85,6 +85,7 @@ import os,sys,glob
 from datetime import datetime
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 #* Only if you want to plot anything
 from matplotlib import pyplot as plt
@@ -291,7 +292,7 @@ df_EVENT_ID = pd.DataFrame(data={'CODE':EVENT_ID_CODEs, 'DECODE':EVENT_ID_DECODE
 #     - `DATSCAN`[CAUDATE_R, CAUDATE_L, PUTAMEN_R, PUTAMEN_L] (occipital:striatal binding ratio, SBR in L&R caudate and putamen)
 #     - AV133 (`AVIMAG`, `ind_av133_sbr`[RCAUD-S, RPUTANT-S, RPUTPOST-S, LCAUD-S, LPUTANT-S, LPUTPOST-S], `ind_av133_metadata`[scan_quality_rating_pet, 12_scan_quality_rating_mr]) 
 #     - `MRI` volumes/atrophy
-#     - `DTIROI` - Calculate FA, MD, RD, AD from DT Eigenvalues in six manually-drawn ROIs in the L&R SN (caudal,middle,rostral), and two reference regions in the L&R cerebral peduncle
+#     - `DTIROI` - FA and Eigenvalues (I think): see [PPMI_DTI_ROI_Methods_20160915.pdf](/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/CSV/PPMI_DTI_ROI_Methods_20160915.pdf), the six ROIs are manually-drawn ones in the L&R SN, and two reference regions in the L&R cerebral peduncle
 
 # ### Data Preparation step 1: Identify enrolled subjects and demographics
 #*** Enrolled subjects: in both SCREEN and RANDOM, plus non-null ENROLLDT in RANDOM table ***
@@ -1200,6 +1201,7 @@ for k in range(0,df_DTIROI_FA_.shape[0]):
 df_DTIROI_unstacked = df_DTIROI_FA_.merge(df_DTIROI_E1_,on=Keys_DTIROI,how='left').merge(df_DTIROI_E2_,on=Keys_DTIROI,how='left').merge(df_DTIROI_E3_,on=Keys_DTIROI,how='left')
 #* Merge with MRI to get EVENT_ID
 df_DTIROI_ = pd.merge(df_MRI.loc[df_MRI.MRIWDTI==1,['PATNO','EVENT_ID','MRIDT']],df_DTIROI_unstacked,left_on=['PATNO','MRIDT'],right_on=['PATNO','INFODT'],how='right')
+
 #* Calculate axial/radial/mean diffusivity and FA
 # NOTE: This assumes that Measures E1/E2/E3 are DTI eigenvalues,
 #       but they might not be, since FA doesn't match FA_calc
