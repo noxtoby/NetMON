@@ -25,7 +25,7 @@ Instructions:
 """
 __author__ = "Neil P Oxtoby"
 __copyright__ = "Copyright 2015-2018, Neil P Oxtoby"
-__credits__ = ["Neil Oxtoby", "Coffee", "Biomarkers Across Neurodegenerative Disease"]
+__credits__ = ["Neil Oxtoby", "Coffee", "Biomarkers Across Neurodegenerative Diseases"]
 __license__ = "TBC"
 __version__ = "1.0"
 __maintainer__ = "Neil Oxtoby"
@@ -89,7 +89,7 @@ from scipy import stats
 
 #* Only if you want to plot anything
 from matplotlib import pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 plt.style.use('ggplot')
 from matplotlib import rcParams # For changing default figure size
 
@@ -181,8 +181,10 @@ def df_crossjoin(df1, df2, **kwargs):
 #   - Drop uninteresting columns (`update_stamp`, `REC_ID`, etc.)
 #   - Ensure `PATNO` is a string
 #******** FIX ME **********
-PPMI_csv_path = os.path.join('path','to','PPMI','Data')
-PPMI_csv_path = os.path.join('/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data','CSV')
+data_path = os.path.join('path','to','PPMI','Data')
+data_path = '/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data'
+PPMI_csv_path = os.path.join(data_path,'CSV')
+PPMI_csv_path = os.path.join(PPMI_csv_path,'2019-03-28')
 #****** END FIX ME ********
 PPMIMERGE_csv = os.path.normpath(os.path.join(PPMI_csv_path,'PPMIMERGE.csv')) # output file
 
@@ -191,6 +193,8 @@ BIOLAB_csv = os.path.normpath(os.path.join(data_path,'Biospecimen_Analysis_Resul
 
 daysInAYear = 365.25
 runDate = datetime.today().isoformat().replace('-','')[0:8]
+
+PPMIMERGE_csv = os.path.normpath(os.path.join(PPMI_csv_path,'PPMIMERGE_%s.csv' % str(runDate))) # output file
 
 #* Identify all the CSV files
 PPMI_tables = glob.glob(os.path.join(PPMI_csv_path,'*.csv'))
@@ -301,7 +305,7 @@ df_RANDOM_enrolled = df_RANDOM.loc[df_RANDOM.ENROLLDT.notnull(),:]
 df_SCREEN = PPMI_df[np.where([1 if n=="Screening___Demographics" else 0 for n in PPMI_df_names])[0][0]].copy()
 # Inner join: RANDOM and SCREEN. Get APPRDX and race/ethnicity from SCREEN
 df_RANDOM_enrolled = pd.merge(df_RANDOM_enrolled[['PATNO','BIRTHDT','GENDER','ENROLLDT','CONSNTDT']],
-                              df_SCREEN[['PATNO','APPRDX',
+                              df_SCREEN[['PATNO','APPRDX','CURRENT_APPRDX',
                                          'HISPLAT','RAINDALS','RAASIAN','RABLACK','RAHAWOPI','RAWHITE','RANOS']].sort_values('PATNO',axis=0),
                               on='PATNO',suffixes=['_Random','_Screen'])
 df_RANDOM_enrolled.rename(index=str, columns={'APPRDX':'APPRDX_SCREEN'})
@@ -321,7 +325,7 @@ df_RANDOM_enrolled
 #  - (PPMI_CSF_baseline_analysis_Assay_variability_April_2014.pdf says to keep 2013 rather than 2011, but there are others that get reprocessed)
 # 4. Convert `TESTVALUE` to numeric using a map: replaces text entries such as 'below detection limit' with the detection limit
 # 5. Convert long format to semi-wide: one column per `TESTNAME`, populated by `TESTVALUE`
-Bio_n = np.where([1 if n=="Biospecimen_Analysis_Results" else 0 for n in PPMI_df_names])[0][0]
+Bio_n = np.where([1 if n=="Current_Biospecimen_Analysis_Results" else 0 for n in PPMI_df_names])[0][0]
 df_BIO = PPMI_df[Bio_n].copy()
 df_BIO.PI_INSTITUTION = df_BIO.PI_INSTITUTION.str.replace("’","") #* Annoying weirdly-encoded apostrophe
 df_BIO.PATNO = df_BIO.PATNO.map(str)
@@ -393,6 +397,41 @@ df_BIOLAB_SemiWide.to_csv(BIOLAB_csv)
 # - 3.1 Calculate total scores and subscores for various assessments
 # 
 # When merging later, rename `INFODT` columns: add suffix (e.g., `PAG_NAME` where it exists)
+#*** Add LEDD: see PPMI_Methods_LESS_LevodopaEquivalent_Daily_Dose_20160608.pdf
+def calculate_ledd_CONMED(df_CONMED):
+    """
+    FIXME: Work In Progress
+    
+    For PD medications except COMT inhibitors, the column LEDD will show the value 
+    of the Levodopa equivalent dose for that medication. 
+    
+    For COMT inhibitors, the column LEDD will read 
+    “LD x 0.33” (for Entacapone) or 
+    “LD x 0.5” (for Tolcapone). 
+    
+    To find the LEDD for COMT inhibitors, first find the total dose of Levodopa only, 
+    and then multiply the Levodopa dose by either 0.33 or 0.5 as instructed.
+    
+    To find the total LEDD at a specific time point: 
+    - add all values of the column LEDD for the PD medications taken at that time point. 
+    Anticholinergics and other PD medications that are not included in the calculation 
+    of the total LEDD will have a missing value for the LEDD column.
+    
+    """
+    df_cm = df_CONMED[['PATNO','EVENT_ID','LEDD','STARTDT','STOPDT']].copy()
+    not_missing = ~df_cm[['LEDD','STARTDT','STOPDT']].isnull().all(axis=1)
+    df_cm = df_cm.loc[not_missing].copy().sort_values(by='PATNO').reset_index(drop=True)
+    
+    #* LEDD for each medication
+    ledd = df_cm.LEDD.values
+    #* 
+    ledd_COMT
+    
+    #* LEDD is for all but COMT inhibitors, which show '0.3 x LD'
+    df_cm = df_cm['PATNO','EVENT_ID','LEDD']
+    df_temp = pd.merge(df,df_cm,on=['PATNO','EVENT_ID'],how='left')
+    return df_temp
+
 def calculate_scores_MOCA(df_MOCA):
     """
     Calculates MOCA subscores by summing the relevant questions:
@@ -739,6 +778,7 @@ def calculate_scores_PECN(df_PECN):
 #* PPMI raw tables
 tables_of_interest = {
     'PDMEDUSE':'Use_of_PD_Medication',
+    #'CONMED':'Concomitant_Medications',
     'CLINDX':'Clinical_Diagnosis_and_Management',
     'PDFEAT':'PD_Features',
     'VITAL':'Vital_Signs',
@@ -758,7 +798,7 @@ tables_of_interest = {
     'NUPDRS1':'MDS_UPDRS_Part_I',
     'NUPDRS1p':'MDS_UPDRS_Part_I__Patient_Questionnaire',
     'NUPDRS2p':'MDS_UPDRS_Part_II__Patient_Questionnaire',
-    'NUPDRS3':'MDS_UPDRS_Part_III__Post_Dose_',
+    'NUPDRS3':'MDS_UPDRS_Part_III', #'NUPDRS3':'MDS_UPDRS_Part_III__Post_Dose_',
     'NUPDRS4':'MDS_UPDRS_Part_IV',
     'UPSIT':'University_of_Pennsylvania_Smell_ID_Test',
     'SCOPAAUT':'SCOPA_AUT',
@@ -775,6 +815,7 @@ valz = list(tables_of_interest.values())
 keyz = list(tables_of_interest.keys())
 columns_of_interest = {
     'PDMEDUSE':['PDMEDYN','ONLDOPA','ONDOPAG','ONOTHER'],
+    #'CONMED':['LEDD'],
     'CLINDX':['INFODT', 'PRIMDIAG', 'DCRTREM', 'DCRIGID', 'DCBRADY'],
     'PDFEAT':['PDDXDT','PDDXEST','DXTREMOR','DXRIGID','DXBRADY','DOMSIDE'], 
     'VITAL':['WGTKG', 'HTCM', 'TEMPC', 'SYSSUP', 'DIASUP', 'HRSUP', 'SYSSTND', 'DIASTND', 'HRSTND'],
@@ -900,6 +941,7 @@ columns_of_interest['NUPDRS4'].extend(calculate_scores_NUPDRS4(df_NUPDRS4))
 #*** 4.1 Subjects table
 df_subjects = df_RANDOM_enrolled.copy()
 df_subjects['APPRDX_enrol'] = df_subjects['APPRDX']
+df_subjects['APPRDX_current'] = df_subjects['CURRENT_APPRDX']
 df_subjects.drop('APPRDX',axis=1,inplace=True)
 
 #* Add covariates *#
@@ -909,8 +951,8 @@ df_subjects.drop('APPRDX',axis=1,inplace=True)
 # N 2nd-degree relatives with PD = sum(Half Siblings, Grandparents, Aunts, Uncles)
 df_FAMHXPD = PPMI_df[np.where([1 if n=="Family_History__PD_" else 0 for n in PPMI_df_names])[0][0]].copy()
 df_tmp = df_FAMHXPD.copy()
-df_tmp['FAMHXPD_N1stDegree'] = df_tmp[['BIOMOMPD','BIODADPD','FULSIBPD','KIDSPD']].fillna(0).sum(axis=1)
-df_tmp['FAMHXPD_N2ndDegree'] = df_tmp[['HAFSIBPD','MAGPARPD','PAGPARPD','MATAUPD','PATAUPD']].fillna(0).sum(axis=1)
+df_tmp['FAMHXPD_N1stDegree'] = df_tmp[['BIOMOMPD','BIODADPD','FULSIBPD','KIDSPD']].sum(axis=1)
+df_tmp['FAMHXPD_N2ndDegree'] = df_tmp[['HAFSIBPD','MAGPARPD','PAGPARPD','MATAUPD','PATAUPD']].sum(axis=1)
 # Remove duplicates: keeping most recent LAST_UPDATE
 df_tmp = df_tmp.sort_values(by=['PATNO','LAST_UPDATE'])
 df_tmp = df_tmp[~df_tmp.duplicated(subset='PATNO',keep='last')]
@@ -934,7 +976,7 @@ df_PDFEAT_tmp = df_PDFEAT_tmp.merge(df_subjects[['PATNO','ENROLLDT']],on=['PATNO
 df_PDFEAT_tmp[PDDURAT] = (pd.to_datetime(df_PDFEAT_tmp['ENROLLDT']) - pd.to_datetime(df_PDFEAT_tmp['PDDXDT'])).apply(lambda x: round(x.days/daysInAYear,3))
 df_subjects = df_subjects.merge(df_PDFEAT_tmp[['PATNO',PDDURAT]],on=['PATNO'],how='left')
 
-df_subjects = df_subjects[['PATNO', 'APPRDX_enrol', PDDURAT, 'GENDER', 'BIRTHDT',
+df_subjects = df_subjects[['PATNO', 'APPRDX_enrol', 'APPRDX_current', PDDURAT, 'GENDER', 'BIRTHDT',
                            'GENECAT', 'MUTRSLT', 'LRRKCD', # genetics info
                            'FAMHXPD_N1stDegree', 'FAMHXPD_N2ndDegree', 
                            'EDUCYRS','HANDED',
@@ -956,11 +998,20 @@ df_base.reset_index(drop=True,inplace=True)
 # - 4.5 Cleanup - remove empty rows
 df_PPMIMERGE = df_base.copy()
 
+print('Merging tables of interest')
+
 key = 'PDMEDUSE'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+
+#* All EVENT_ID=='LOG' in CONMED, so I need to define calculate_ledd() above
+# key = 'CONMED'
+# cols = ['PATNO','EVENT_ID'] + columns_of_interest[key]
+# n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
+# df_ = PPMI_df[n][cols]
+# df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 
 #* One way to check that values actually merged into PPMIMERGE:
 # df_PPMIMERGE.loc[df_PPMIMERGE.PATNO.isin(df_.PATNO),['INFODT_'+key]+cols]
@@ -1132,7 +1183,7 @@ key = 'AVIMAG'
 df_AVIMAG_Imaging = PPMI_df[np.where([1 if n.lower()=="AV_133_Imaging".lower() else 0 for n in PPMI_df_names])[0][0]]  [['PATNO','EVENT_ID','INFODT']].copy()
 df_AVIMAG_Meta = PPMI_df[np.where([1 if n.lower()=="AV_133_Image_Metadata".lower() else 0 for n in PPMI_df_names])[0][0]]  [['PATNO','EVENT_ID',
     'scan_date', 'pass_qc', 'scan_quality_rating_pet', 'ligand']].copy()
-df_AVIMAG_RESULTS = PPMI_df[np.where([1 if n.lower()=="AV_133_SBR_Results".lower() else 0 for n in PPMI_df_names])[0][0]]  [['SUBJECT_NUMBER', 'VISIT_NUMBER', 'SCAN_DATE', 'TIMEPOINT',
+df_AVIMAG_RESULTS = PPMI_df[np.where([1 if n.lower()=="AV_133_SBR_Results".lower() else 0 for n in PPMI_df_names])[0][0]]  [['SUBJECT_NUMBER', 'VISIT_NUMBER', #'SCAN_DATE', 'TIMEPOINT',
     'RCAUD-S', 'RPUTANT-S', 'RPUTPOST-S', 'LCAUD-S', 'LPUTANT-S', 'LPUTPOST-S']].copy()
 df_AVIMAG_RESULTS.rename(index=str, 
                          columns={"SUBJECT_NUMBER": "PATNO", "VISIT_NUMBER": "EVENT_ID"}, 
@@ -1154,6 +1205,8 @@ key = 'DTIROI'
 cols = ['PATNO','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_DTIROI = PPMI_df[n][cols].copy()
+
+print('   ...Working on DTI ')
 
 #*** Unstack the Measure column: E1, E2, E3, FA
 #* NOTE: occasionally there are multiple rows per visit
@@ -1237,10 +1290,11 @@ plt.show()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_DTIROI_,on=Keys,how='left',suffixes=('','_DTI'))
 
 # ## MRI volumes: you'll have to add this information manually
-include_MRI_volumes = False
+include_MRI_volumes = True
 #* Here's my code, which used the parcellation results from the Geodesic Information Flows algorithm,
 #* along with meta data (mostly image ID) from a couple of IDA searches
 if include_MRI_volumes:
+    print('Including processed MRI')
     ## * Preprocessed structural MRI: T1-Anatomical
     #******************** FIX ME *******************
     PPMI_T1_Anatomical_IDASEARCH_csv = os.path.join("/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/","PPMI-T1-Anatomical_4_06_2018.csv")
@@ -1271,7 +1325,7 @@ if include_MRI_volumes:
     
     #* GIF volumes
     #******************** FIX ME *******************
-    df_MRI_ROIvols = pd.read_csv("/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/PPMI-T1-Anatomical_GIF3Vols.csv")
+    df_MRI_ROIvols = pd.read_csv(os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv"))
     #****************** END FIX ME *****************
     ROI_labels = df_MRI_ROIvols.columns[2:]
     ext = '.nii'
@@ -1400,14 +1454,108 @@ if include_MRI_volumes:
         'Left TTG transverse temporal gyrus',
         'Right vessel','Left vessel','Right Lesion','Left Lesion',
         'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
-        ]
+    ]
+    ROI_labels_FreeSurfer = [
+        #* ROI volumes
+        'lh_bankssts_volume', 'lh_caudalanteriorcingulate_volume', 'lh_caudalmiddlefrontal_volume', 
+        'lh_cuneus_volume', 'lh_entorhinal_volume', 'lh_fusiform_volume',
+        'lh_inferiorparietal_volume', 'lh_inferiortemporal_volume', 'lh_isthmuscingulate_volume', 
+        'lh_lateraloccipital_volume', 'lh_lateralorbitofrontal_volume', 'lh_lingual_volume',
+        'lh_medialorbitofrontal_volume', 'lh_middletemporal_volume', 'lh_parahippocampal_volume', 
+        'lh_paracentral_volume', 'lh_parsopercularis_volume', 'lh_parsorbitalis_volume', 
+        'lh_parstriangularis_volume', 'lh_pericalcarine_volume', 'lh_postcentral_volume', 
+        'lh_posteriorcingulate_volume', 'lh_precentral_volume', 'lh_precuneus_volume', 
+        'lh_rostralanteriorcingulate_volume', 'lh_rostralmiddlefrontal_volume', 
+        'lh_superiorfrontal_volume', 'lh_superiorparietal_volume', 'lh_superiortemporal_volume', 
+        'lh_supramarginal_volume', 'lh_frontalpole_volume', 'lh_temporalpole_volume', 
+        'lh_transversetemporal_volume', 'lh_insula_volume', 'rh_bankssts_volume', 
+        'rh_caudalanteriorcingulate_volume', 'rh_caudalmiddlefrontal_volume', 'rh_cuneus_volume', 
+        'rh_entorhinal_volume', 'rh_fusiform_volume', 'rh_inferiorparietal_volume', 
+        'rh_inferiortemporal_volume', 'rh_isthmuscingulate_volume', 'rh_lateraloccipital_volume', 
+        'rh_lateralorbitofrontal_volume', 'rh_lingual_volume', 'rh_medialorbitofrontal_volume', 
+        'rh_middletemporal_volume', 'rh_parahippocampal_volume', 'rh_paracentral_volume', 
+        'rh_parsopercularis_volume', 'rh_parsorbitalis_volume', 'rh_parstriangularis_volume', 
+        'rh_pericalcarine_volume', 'rh_postcentral_volume', 'rh_posteriorcingulate_volume', 
+        'rh_precentral_volume', 'rh_precuneus_volume', 'rh_rostralanteriorcingulate_volume', 
+        'rh_rostralmiddlefrontal_volume', 'rh_superiorfrontal_volume', 'rh_superiorparietal_volume', 
+        'rh_superiortemporal_volume', 'rh_supramarginal_volume', 'rh_frontalpole_volume', 
+        'rh_temporalpole_volume', 'rh_transversetemporal_volume', 'rh_insula_volume', 
+        #* Cortical thicknesses
+        'lh_bankssts_thickness', 'lh_caudalanteriorcingulate_thickness', 
+        'lh_caudalmiddlefrontal_thickness', 'lh_cuneus_thickness', 
+        'lh_entorhinal_thickness', 'lh_fusiform_thickness', 
+        'lh_inferiorparietal_thickness', 'lh_inferiortemporal_thickness', 
+        'lh_isthmuscingulate_thickness', 'lh_lateraloccipital_thickness', 
+        'lh_lateralorbitofrontal_thickness', 'lh_lingual_thickness', 
+        'lh_medialorbitofrontal_thickness', 'lh_middletemporal_thickness', 
+        'lh_parahippocampal_thickness', 'lh_paracentral_thickness', 
+        'lh_parsopercularis_thickness', 'lh_parsorbitalis_thickness', 
+        'lh_parstriangularis_thickness', 'lh_pericalcarine_thickness', 
+        'lh_postcentral_thickness', 'lh_posteriorcingulate_thickness', 
+        'lh_precentral_thickness', 'lh_precuneus_thickness', 'lh_rostralanteriorcingulate_thickness', 
+        'lh_rostralmiddlefrontal_thickness', 'lh_superiorfrontal_thickness', 
+        'lh_superiorparietal_thickness', 'lh_superiortemporal_thickness', 
+        'lh_supramarginal_thickness', 'lh_frontalpole_thickness', 'lh_temporalpole_thickness', 
+        'lh_transversetemporal_thickness', 'lh_insula_thickness', 'lh_MeanThickness_thickness', 
+        'rh_bankssts_thickness', 'rh_caudalanteriorcingulate_thickness', 
+        'rh_caudalmiddlefrontal_thickness', 'rh_cuneus_thickness', 'rh_entorhinal_thickness', 
+        'rh_fusiform_thickness', 'rh_inferiorparietal_thickness', 'rh_inferiortemporal_thickness', 
+        'rh_isthmuscingulate_thickness', 'rh_lateraloccipital_thickness', 
+        'rh_lateralorbitofrontal_thickness', 'rh_lingual_thickness', 'rh_medialorbitofrontal_thickness', 
+        'rh_middletemporal_thickness', 'rh_parahippocampal_thickness', 'rh_paracentral_thickness', 
+        'rh_parsopercularis_thickness', 'rh_parsorbitalis_thickness', 'rh_parstriangularis_thickness', 
+        'rh_pericalcarine_thickness', 'rh_postcentral_thickness', 'rh_posteriorcingulate_thickness', 
+        'rh_precentral_thickness', 'rh_precuneus_thickness', 'rh_rostralanteriorcingulate_thickness', 
+        'rh_rostralmiddlefrontal_thickness', 'rh_superiorfrontal_thickness', 
+        'rh_superiorparietal_thickness', 'rh_superiortemporal_thickness', 'rh_supramarginal_thickness', 
+        'rh_frontalpole_thickness', 'rh_temporalpole_thickness', 'rh_transversetemporal_thickness', 
+        'rh_insula_thickness', 'rh_MeanThickness_thickness', 
+        #* ROI surface area
+        'lh_bankssts_area', 'lh_caudalanteriorcingulate_area', 'lh_caudalmiddlefrontal_area', 
+        'lh_cuneus_area', 'lh_entorhinal_area', 'lh_fusiform_area', 'lh_inferiorparietal_area', 
+        'lh_inferiortemporal_area', 'lh_isthmuscingulate_area', 'lh_lateraloccipital_area', 
+        'lh_lateralorbitofrontal_area', 'lh_lingual_area', 'lh_medialorbitofrontal_area', 
+        'lh_middletemporal_area', 'lh_parahippocampal_area', 'lh_paracentral_area', 
+        'lh_parsopercularis_area', 'lh_parsorbitalis_area', 'lh_parstriangularis_area', 
+        'lh_pericalcarine_area', 'lh_postcentral_area', 'lh_posteriorcingulate_area', 
+        'lh_precentral_area', 'lh_precuneus_area', 'lh_rostralanteriorcingulate_area', 
+        'lh_rostralmiddlefrontal_area', 'lh_superiorfrontal_area', 'lh_superiorparietal_area', 
+        'lh_superiortemporal_area', 'lh_supramarginal_area', 'lh_frontalpole_area', 
+        'lh_temporalpole_area', 'lh_transversetemporal_area', 'lh_insula_area', 
+        'lh_WhiteSurfArea_area', 'rh_bankssts_area', 'rh_caudalanteriorcingulate_area', 
+        'rh_caudalmiddlefrontal_area', 'rh_cuneus_area', 'rh_entorhinal_area', 'rh_fusiform_area', 
+        'rh_inferiorparietal_area', 'rh_inferiortemporal_area', 'rh_isthmuscingulate_area', 
+        'rh_lateraloccipital_area', 'rh_lateralorbitofrontal_area', 'rh_lingual_area', 
+        'rh_medialorbitofrontal_area', 'rh_middletemporal_area', 'rh_parahippocampal_area', 
+        'rh_paracentral_area', 'rh_parsopercularis_area', 'rh_parsorbitalis_area', 
+        'rh_parstriangularis_area', 'rh_pericalcarine_area', 'rh_postcentral_area', 
+        'rh_posteriorcingulate_area', 'rh_precentral_area', 'rh_precuneus_area', 
+        'rh_rostralanteriorcingulate_area', 'rh_rostralmiddlefrontal_area', 'rh_superiorfrontal_area', 
+        'rh_superiorparietal_area', 'rh_superiortemporal_area', 'rh_supramarginal_area', 
+        'rh_frontalpole_area', 'rh_temporalpole_area', 'rh_transversetemporal_area', 'rh_insula_area', 
+        'rh_WhiteSurfArea_area'
+    ]
+    # ****** FIX ME ******
+    PPMI_FreeSurfer_path = data_path #os.path.join(PPMI_csv_path,'..')
+    # freesurfer_file = os.path.join(PPMI_FreeSurfer_path,'PPMI-T1-Anatomical_freesurfer5p3p0.csv')
+    freesurfer_file = os.path.join(PPMI_FreeSurfer_path,'PPMI-T1-Anatomical_freesurfer6p0p0.csv')
+    df_freesurfer = pd.read_csv(freesurfer_file,low_memory=False)
+    if df_freesurfer['SeriesID'].dtype == str:
+        df_freesurfer['SeriesID'] = df_freesurfer['SeriesID'].map(lambda x: int(x.replace('S','')))
+    if df_freesurfer['ImageID'].dtype == str:
+        df_freesurfer['ImageID'] = df_freesurfer['ImageID'].map(lambda x: int(x.replace('I','')))
+    if df_freesurfer['PATNO'].dtype != str:
+        df_freesurfer['PATNO'] = df_freesurfer['PATNO'].map(lambda x: str(x))
+    # ****** END FIX ME ******
     
     if reorder:
-        df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID','filenames'] + ROI_labels_GIF3]
+        df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID','MRI_filename'] + ROI_labels_GIF3]
     
-    #* Merge MRI and GIF: for EVENT_ID
+    #* Join MRI and GIF: for EVENT_ID
     df_MRI_vols = pd.merge(df_MRI_ROIvols,df_MRI_ref[['EVENT_ID','PATNO','ImageID']],on=['PATNO','ImageID'],how='left')
-    #* Merge PPMIMERGE and MRI
+    #* Join with FreeSurfer
+    df_MRI_vols = pd.merge(df_MRI_vols,df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer],on=['PATNO','ImageID'],how='left')
+    #* Join PPMIMERGE and MRI_vols
     df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI_vols,on=Keys,how='left',suffixes=('','_MRI'))
 else:
     print('ALERT: No MRI. If you want to include regional brain volumes (e.g., from FreeSurfer), here''s where you could be doing it.')
@@ -1443,6 +1591,7 @@ else:
 #     - H1/H1: sum of minor alleles for all 5 SNPs is <5
 #     - H1/H2: sum = 5
 #     - H2/H2: sum = 10
+print('Calculating some derived variables (Derived_Variable_Definitions_and_Score_Calculations.csv)')
 df_PPMIMERGE['TD_score'] = df_PPMIMERGE[['NP2TRMR', 'NP3PTRMR', 'NP3PTRML', 'NP3KTRMR', 'NP3KTRML', 'NP3RTARU', 'NP3RTALU', 'NP3RTARL', 'NP3RTALL', 'NP3RTALJ', 'NP3RTCON']].mean(axis=1)
 df_PPMIMERGE['PIGD_score'] = df_PPMIMERGE[['NP2WALK', 'NP2FREZ', 'NP3GAIT', 'NP3FRZGT', 'NP3PSTBL']].mean(axis=1)
 df_PPMIMERGE['TD_PIGD_ratio'] = df_PPMIMERGE.TD_score / df_PPMIMERGE.PIGD_score.replace({ 0 : np.nan })
@@ -1520,6 +1669,7 @@ def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
     
     return df
 
+print('Filling in missing INFODTs')
 df_PPMIMERGE = fill_missing_INFODT(df_PPMIMERGE,INFODT_cols)
 
 # # Validate PPMIMERGE
@@ -1563,6 +1713,8 @@ def validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys=['PATNO','EVENT_ID']):
     
     return (n,unmatched_rows)
 
+print(' > > > > Validating PPMI MERGE')
+
 # ## Manual: dataframes requiring intervention
 keys = ['PATNO','EVENT_ID']
 #* DTI biomarkers
@@ -1574,41 +1726,48 @@ c = keys + cols
 df = df_DTIROI_unstacked.loc[df_DTIROI_unstacked.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
 (DTIROI_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if DTIROI_validated==0:
-    print('DTI biomarkers validated')
+    print('DTI table join validated')
 else:
-    print('DTI biomarkers failed validation')
+    print('DTI table join failed validation')
 #* AV Imaging
 cols = ['RCAUD-S', 'RPUTANT-S', 'RPUTPOST-S', 'LCAUD-S', 'LPUTANT-S', 'LPUTPOST-S']
 c = Keys + cols
 df = df_AVIMAG.loc[df_AVIMAG.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
 (AVIMAG_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if AVIMAG_validated==0:
-    print('AV Imaging biomarkers validated')
+    print('AV Imaging table join validated')
 else:
-    print('AV Imaging biomarkers failed validation')
+    print('AV Imaging table join failed validation')
 #* BIO
-cols = ['ABeta 1-42', 'Abeta 42',
-       'Apolipoprotein A1', 'CSF Alpha-synuclein', 'CSF Hemoglobin',
-       'EGF ELISA', 'HDL', 'IgG', 'IgG3', 'IgG3/IgG', 'LDL', 'MTDNA_DELETION',
-       'MTDNA_ND1_CN', 'MTDNA_ND4_CN', 'NDNA_B2M_CN', 'NDNA_B2M_CN_v2', 'PD2',
-       'PD2 Peptoid', 'PD2 peptoid', 'Serum IGF-1', 'Total Cholesterol',
-       'Total tau', 'Triglycerides', 'p-Tau181P', 'pTau', 'tTau']
+# cols = ['ABeta 1-42', 'Abeta 42',
+#        'Apolipoprotein A1', 'CSF Alpha-synuclein', 'CSF Hemoglobin',
+#        'EGF ELISA', 'HDL', 'IgG', 'IgG3', 'IgG3/IgG', 'LDL', 'MTDNA_DELETION',
+#        'MTDNA_ND1_CN', 'MTDNA_ND4_CN', 'NDNA_B2M_CN', 'NDNA_B2M_CN_v2', 'PD2',
+#        'PD2 Peptoid', 'PD2 peptoid', 'Serum IGF-1', 'Total Cholesterol',
+#        'Total tau', 'Triglycerides', 'p-Tau181P', 'pTau', 'tTau']
+cols = ['CSF Alpha-synuclein', 'ABeta 1-42', 'pTau', 'tTau', 
+        'CSF Hemoglobin','Dopamine',
+        'EGF ELISA', 'HDL', 'IgG', 'IgG3', 'IgG3/IgG', 'LDL', 
+        'MTDNA_DELETION', 'MTDNA_ND1_CN', 'MTDNA_ND4_CN', 
+        'NDNA_B2M_CN', 'NDNA_B2M_CN_v2', 'PD2',
+        'PD2 Peptoid', 'PD2 peptoid', 'Serum IGF-1', 'Total Cholesterol',
+        'Triglycerides', 'Apolipoprotein A1']
 c = Keys + cols
 df = df_BIOLAB_SemiWide.loc[df_BIOLAB_SemiWide.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
 (BIOLAB_SemiWide_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if BIOLAB_SemiWide_validated==0:
-    print('BIOLAB biomarkers validated')
+    print('BIOLAB table join validated')
 else:
-    print('BIOLAB failed validation')
+    print('BIOLAB table join failed validation')
 #* DATSCAN
 cols = ['CAUDATE_L','CAUDATE_R','PUTAMEN_L','PUTAMEN_R']
 c = Keys + cols
 df = df_DATSCAN.loc[df_DATSCAN.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
 (DATSCAN_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if DATSCAN_validated==0:
-    print('DATSCAN biomarkers validated')
+    print('DATSCAN table join validated')
 else:
-    print('DATSCAN failed validation')
+    print('DATSCAN table join failed validation')
 #* UPDRS3: beware PN3RIGRL vs NP3RIGRL (my renamed version)
 cols = ['NP3_TOT', 'NP3SPCH', 'NP3FACXP', 'NP3RIGN', 'NP3RIGRU',
        'NP3RIGLU', 'PN3RIGRL', 'NP3RIGLL', 'NP3FTAPR', 'NP3FTAPL', 'NP3HMOVR',
@@ -1625,17 +1784,17 @@ cols__ = [col+'_NUPDRS3A' for col in cols_]
 df.rename(columns=dict(zip(cols_,cols__)),inplace=True)
 (NUPDRS3A_validated,NUPDRS3A_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols__,keys)
 if NUPDRS3A_validated==0:
-    print('NUPDRS3A biomarkers validated')
+    print('NUPDRS3A table join validated')
 else:
-    print('NUPDRS3A failed validation')
+    print('NUPDRS3A table join failed validation')
 
 df = df_NUPDRS3.loc[df_NUPDRS3.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
 df.rename(columns={'PN3RIGRL':'NP3RIGRL'},inplace=True)
 (NUPDRS3_validated,NUPDRS3_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols_,keys)
 if NUPDRS3_validated==0:
-    print('NUPDRS3 biomarkers validated')
+    print('NUPDRS3 table join validated')
 else:
-    print('NUPDRS3 failed validation')
+    print('NUPDRS3 table join failed validation')
 
 #* CLINDX
 key = 'CLINDX'
@@ -1646,9 +1805,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (CLINDX_validated,CLINDX_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if CLINDX_validated==0:
-    print('CLINDX biomarkers validated')
+    print('CLINDX table join validated')
 else:
-    print('CLINDX failed validation')
+    print('CLINDX table join failed validation')
 
 #* MRI
 if include_MRI_volumes:
@@ -1661,9 +1820,9 @@ if include_MRI_volumes:
     df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
     (MRI_validated,MRI_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
     if MRI_validated==0:
-        print('MRI biomarkers validated')
+        print('MRI table join validated')
     else:
-        print('MRI failed validation')
+        print('MRI table join failed validation')
 
 #* Use of PD medication
 key = 'PDMEDUSE'
@@ -1674,9 +1833,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (PDMEDUSE_validated,PDMEDUSE_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if PDMEDUSE_validated==0:
-    print('{0} biomarkers validated'.format(key))
+    print('{0} table join validated'.format(key))
 else:
-    print('{0} failed validation'.format(key))
+    print('{0} table join failed validation'.format(key))
     print(PDMEDUSE_unmatched_rows)
 
 #* Neuro exam
@@ -1693,9 +1852,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (PENEURO_validated,PENEURO_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if PENEURO_validated==0:
-    print('{0} biomarkers validated'.format(key))
+    print('{0} table join validated'.format(key))
 else:
-    print('{0} failed validation'.format(key))
+    print('{0} table join failed validation'.format(key))
     print(PENEURO_unmatched_rows)
 
 #* QUIPCS
@@ -1711,9 +1870,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (QUIPCS_validated,QUIPCS_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if QUIPCS_validated==0:
-    print('{0} biomarkers validated'.format(key))
+    print('{0} table join validated'.format(key))
 else:
-    print('{0} failed validation'.format(key))
+    print('{0} table join failed validation'.format(key))
     print(QUIPCS_unmatched_rows)
 
 #* SCOPA
@@ -1729,9 +1888,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (SCOPAAUT_validated,SCOPAAUT_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if SCOPAAUT_validated==0:
-    print('{0} biomarkers validated'.format(key))
+    print('{0} table join validated'.format(key))
 else:
-    print('{0} failed validation'.format(key))
+    print('{0} table join failed validation'.format(key))
     print(SCOPAAUT_unmatched_rows)
 
 #* Benton
@@ -1747,9 +1906,9 @@ df_ = PPMI_df[n][c]
 df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 (LINEORNT_validated,LINEORNT_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if LINEORNT_validated==0:
-    print('{0} biomarkers validated'.format(key))
+    print('{0} table join validated'.format(key))
 else:
-    print('{0} failed validation'.format(key))
+    print('{0} table join failed validation'.format(key))
     print(LINEORNT_unmatched_rows)
 
 # ## Validate the rest automatically using `tables_of_interest` and `columns_of_interest`
@@ -1776,9 +1935,9 @@ for k in dfs_of_interest:
     df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
     (v,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
     if v==0:
-        print('{0} biomarkers validated'.format(k))
+        print('{0} table join validated'.format(k))
     else:
-        print('{0} failed validation'.format(k))
+        print('{0} table join failed validation'.format(k))
         df_ = df.copy()
     dfs_validated.append(v)
     unmatched_rows_.append(unmatched_rows)
@@ -1797,21 +1956,33 @@ df_PPMIMERGE_ = df_PPMIMERGE.loc[~empty_rows].copy()
 # ## Merge `BL` and `SC`, where they both exist
 # Tests performed at screening usually weren't repeated at baseline. Notably:
 # - MOCA, GDSSHORT, DATSCAN, PECN, PENEURO, STAI
-# Uses `pd.DataFrame.fillna()` (NOTE: since visit order is chronological in PPMIMERGE, `SC` is before `BL` and we can forward fill)
+# Uses `pd.DataFrame.fillna()` (NOTE: since visit order is chronological in PPMIMERGE, `SC` is before `BL` and we can forward fill - I sort below, just in case)
 boo = (df_PPMIMERGE_.EVENT_ID=='SC') & (~df_PPMIMERGE_.PATNO.isin(['42418R','42415R']))
 x = df_PPMIMERGE_.loc[boo,'MCATOT']
 x_PATNO = df_PPMIMERGE_.loc[boo,'PATNO']
 #* Identify SC and BL rows
 scbl = (df_PPMIMERGE_.EVENT_ID=='BL') | (df_PPMIMERGE_.EVENT_ID=='SC')
 #* Pad selected columns: copy, fillna, reinsert
-c = columns_of_interest['MOCA'] + columns_of_interest['GDSSHORT'] + columns_of_interest['DATSCAN_RESULTS']     + columns_of_interest['PECN'] + columns_of_interest['PENEURO']     + columns_of_interest['STAI']
+c = columns_of_interest['MOCA'] + columns_of_interest['GDSSHORT'] \
+    + columns_of_interest['DATSCAN_RESULTS'] \
+    + columns_of_interest['PECN'] + columns_of_interest['PENEURO'] \
+    + columns_of_interest['STAI']
 #* Add VSINTRPT, too
 c = c + ['VSINTRPT']
-dftmp = df_PPMIMERGE_.loc[scbl,Keys+c].copy()
-dftmp.fillna(method='pad',axis=0,inplace=True)
-df_PPMIMERGE_.loc[scbl,Keys+c] = dftmp
+#* Extract only SC and BL rows, sort by PATNO ascending and EVENT_ID descending (SC then BL)
+dftmp = df_PPMIMERGE_.loc[scbl,Keys+c].sort_values(by=['PATNO','EVENT_ID'],ascending=[True,False]).copy()
+
+#* Use fillna() with caution: per individual
+PATNO_u = np.unique(dftmp.PATNO)
+for P in PATNO_u:
+    rowz = dftmp.PATNO == P
+    dftmp.loc[rowz,c] = dftmp.loc[rowz,c].fillna(method='ffill',axis=0)
+
+#* Replace SC and BL rows with the fillna()-d data
+df_PPMIMERGE_.loc[dftmp.index,Keys+c] = dftmp
 #* Drop SC visit
 df_PPMIMERGE__ = df_PPMIMERGE_.loc[df_PPMIMERGE_.EVENT_ID!='SC']
+
 
 #* DIAGNOSTIC
 # boo = (df_PPMIMERGE__.EVENT_ID=='BL') & (~df_PPMIMERGE__.PATNO.isin(['42418R','42415R','42357R']))
@@ -1864,6 +2035,7 @@ def calculate_years_bl(df,infodt_col='INFODT_',infodt_bl_col='INFODT_bl'):
     delt = visit_dt - visit_dt_bl
     return delt
 #* Keep three decimal places: PPMI dates are only precise to within one month = 0.083 years
+print('Calculating years since baseline')
 df_PPMIMERGE___['Years_bl'] = calculate_years_bl(df_PPMIMERGE___).apply(lambda x: round(x.days/daysInAYear,3))
 
 #* Age
@@ -1876,7 +2048,7 @@ df_PPMIMERGE___['Age'] = Age
 cols = df_PPMIMERGE___.columns
 cols_list = cols.tolist()
 #* Start with some demographics
-cols_ordered = ['index','PATNO','APPRDX_enrol','EVENT_ID','Age','Years_bl','GENDER',
+cols_ordered = ['index','PATNO','APPRDX_enrol','APPRDX_current','EVENT_ID','Age','Years_bl','GENDER',
                 'FAMHXPD_N1stDegree','FAMHXPD_N2ndDegree',
                 'ENROLLDT','CONSNTDT','GENECAT', 'MUTRSLT', 'LRRKCD','BIRTHDT',
                 'HISPLAT','RAINDALS','RAASIAN','RABLACK','RAHAWOPI','RAWHITE','RANOS'
