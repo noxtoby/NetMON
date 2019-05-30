@@ -20,11 +20,15 @@ Weston Brain Institute.
 Instructions:
   0. Download all of the PPMI CSV files into a single folder: 
      `PPMI_csv_path` (define yourself below)
+  1. If including MRI results (e.g., FreeSurfer), then download the 
+     LONI IDA CSV corresponding to your Image Collection.
+     Define in variable near start of this script
+  2. Search for sections labelled FIXME and replace/comment-out as appropriate
   
   Set some variable names
 """
 __author__ = "Neil P Oxtoby"
-__copyright__ = "Copyright 2015-2018, Neil P Oxtoby"
+__copyright__ = "Copyright 2015-2019, Neil P Oxtoby"
 __credits__ = ["Neil Oxtoby", "Coffee", "Biomarkers Across Neurodegenerative Diseases"]
 __license__ = "TBC"
 __version__ = "1.0"
@@ -32,6 +36,24 @@ __maintainer__ = "Neil Oxtoby"
 __email__ = "neil@neiloxtoby.com"
 __status__ = "Pretty much done"
 __python_version__ = "3.5.2"
+
+import os
+#******** FIX ME **********
+data_path = os.path.join('path','to','PPMI','Data')
+data_path = '/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data'
+PPMI_csv_path = os.path.join(data_path,'CSV')
+PPMI_csv_path = os.path.join(PPMI_csv_path,'2019-03-28')
+#****** END FIX ME ********
+
+#* Your image collection, e.g., T1-anatomical
+wd = "/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/"
+ppmi_t1_ida_csv = os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019.csv")
+#* Corresponding CSV from the IDA search => gives visit codes
+ppmi_t1_ida_search_csv = os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019_idaSearch.csv")
+
+#* Processed image data
+ppmi_t1_gif3_csv = os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv")
+ppmi_t1_freesurfer_csv = ppmi_t1_ida_csv.replace('.csv','_freesurfer6p0p0.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_freesurfer6p0p0.csv")
 
 # ## Notes on PPMI
 #   - Page name (PAG_NAME) is table's key in the Data Dictionary (where PAG_NAME is present)
@@ -81,7 +103,7 @@ __python_version__ = "3.5.2"
 
 # ### === Dependencies, Functions ===
 
-import os,sys,glob
+import sys,glob
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -176,25 +198,17 @@ def df_crossjoin(df1, df2, **kwargs):
     return res
 #***
 
+daysInAYear = 365.25
+
 # ## === Manually load PPMI tables (CSV files) into pandas DataFrames ===
 # Read tables using pandas.read_csv( )
 #   - Drop uninteresting columns (`update_stamp`, `REC_ID`, etc.)
 #   - Ensure `PATNO` is a string
-#******** FIX ME **********
-data_path = os.path.join('path','to','PPMI','Data')
-data_path = '/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data'
-PPMI_csv_path = os.path.join(data_path,'CSV')
-PPMI_csv_path = os.path.join(PPMI_csv_path,'2019-03-28')
-#****** END FIX ME ********
-PPMIMERGE_csv = os.path.normpath(os.path.join(PPMI_csv_path,'PPMIMERGE.csv')) # output file
-
-#* This one needs special treatment
-BIOLAB_csv = os.path.normpath(os.path.join(data_path,'Biospecimen_Analysis_Results_with_Elapsed_Times.csv'))
-
-daysInAYear = 365.25
 runDate = datetime.today().isoformat().replace('-','')[0:8]
+#* Output files
+PPMIMERGE_csv = os.path.normpath(os.path.join(PPMI_csv_path,'PPMIMERGE_%s.csv' % str(runDate))) 
+BIOLAB_csv = os.path.normpath(os.path.join(data_path,'Current_Biospecimen_Analysis_Results_with_Elapsed_Times.csv'))
 
-PPMIMERGE_csv = os.path.normpath(os.path.join(PPMI_csv_path,'PPMIMERGE_%s.csv' % str(runDate))) # output file
 
 #* Identify all the CSV files
 PPMI_tables = glob.glob(os.path.join(PPMI_csv_path,'*.csv'))
@@ -376,6 +390,8 @@ TESTVALUE_dict = {
     '<200':200, '>1700':1700,
     # tTau
     '<80':80,
+    # Dopamine
+    '<LOD':0,
     # ApoE Genotype
     'e2/e2':'22', 'e2/e4':'24', 'e3/e2':'32', 'e3/e3':'33', 'e4/e3':'43', 'e4/e4':'44'}
 df_BIOLAB_["TESTVALUE"].replace(TESTVALUE_dict, inplace=True)
@@ -1005,7 +1021,7 @@ cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
-
+print('.')
 #* All EVENT_ID=='LOG' in CONMED, so I need to define calculate_ledd() above
 # key = 'CONMED'
 # cols = ['PATNO','EVENT_ID'] + columns_of_interest[key]
@@ -1021,12 +1037,14 @@ cols = ['PATNO','EVENT_ID'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'VITAL'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 # CSF etc.
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_BIOLAB_SemiWide,on=Keys,how='left',suffixes=('','_BIOANALYS'))
@@ -1036,48 +1054,56 @@ cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'REMSLEEP'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'EPWORTH'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'UPSIT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'SCOPAAUT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'NUPDRS1'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'NUPDRS1p'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'NUPDRS2p'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'NUPDRS3'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
@@ -1087,6 +1113,7 @@ cols_renamed = [s.replace('PN3','NP3') for s in cols]
 df_ = df_NUPDRS3[cols].copy()
 df_.rename(columns=dict(zip(cols,cols_renamed)),inplace=True)
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'NUPDRS3A'
 cols = columns_of_interest['NUPDRS3'] + columns_of_interest[key]
@@ -1095,6 +1122,7 @@ df_ = df_NUPDRS3A[Keys + ['INFODT'] + cols].copy()
 cols_renamed = [s.replace('PN3','NP3') + '_'+key for s in cols] 
 df_.rename(columns=dict(zip(cols,cols_renamed)),inplace=True)
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 #*** Fix typo in UPDRS3/3A column: PN should be NP (PN3RIGRL => NP3RIGRL)
 columns_of_interest['NUPDRS3'] = [s.replace('PN3','NP3') for s in columns_of_interest['NUPDRS3']]
@@ -1104,71 +1132,83 @@ cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 #*** Total UPDRS score: NP1_TOT + NP2_TOT + NP3_TOT/NP3A_TOT
 #* Sum across columns
 df_PPMIMERGE['UPDRS_TOT'] = df_PPMIMERGE[['NP1_TOT','NP2_TOT','NP3_TOT']].sum(axis=1)
 df_PPMIMERGE['UPDRS_TOT_A'] = df_PPMIMERGE[['NP1_TOT','NP2_TOT','NP3_TOT_NUPDRS3A']].sum(axis=1)
+print('.')
 
 key = 'GDSSHORT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'QUIPCS'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'SFT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'LNSPD'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'LINEORNT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'SDM'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'STAI'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'HVLT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'PECN'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'PENEURO'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][cols]
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'DATSCAN'
 df_DATSCAN = PPMI_df[np.where([1 if n.lower()=="DATScan_Analysis".lower() else 0 for n in PPMI_df_names])[0][0]]  [['PATNO','EVENT_ID',
@@ -1178,6 +1218,7 @@ df_DATSCAN_meta = PPMI_df[np.where([1 if n.lower()=="DaTscan_Imaging".lower() el
     'DATSCAN', 'DATSCNDT', 'SCNLOC', 'SCNINJCT', 'DATXFRYN', 'VSINTRPT']].copy()
 df_DATSCAN = pd.merge(df_DATSCAN,df_DATSCAN_meta)
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_DATSCAN,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'AVIMAG'
 df_AVIMAG_Imaging = PPMI_df[np.where([1 if n.lower()=="AV_133_Imaging".lower() else 0 for n in PPMI_df_names])[0][0]]  [['PATNO','EVENT_ID','INFODT']].copy()
@@ -1192,6 +1233,7 @@ df_AVIMAG_RESULTS['PATNO'] = df_AVIMAG_RESULTS['PATNO'].apply(lambda x: str(x))
 #"SCAN_DATE": "INFODT"
 df_AVIMAG = pd.merge(pd.merge(df_AVIMAG_Imaging,df_AVIMAG_RESULTS,on=['PATNO', 'EVENT_ID']),df_AVIMAG_Meta,on=['PATNO', 'EVENT_ID'])
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_AVIMAG,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'MRI'
 cols = ['PATNO','EVENT_ID','INFODT','MRIDT',
@@ -1200,11 +1242,13 @@ cols = ['PATNO','EVENT_ID','INFODT','MRIDT',
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_MRI = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
 
 key = 'DTIROI'
 cols = ['PATNO','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_DTIROI = PPMI_df[n][cols].copy()
+print('.')
 
 print('   ...Working on DTI ')
 
@@ -1280,12 +1324,13 @@ for k in range(0,len(cols0)):
     df_DTIROI_['DTI_RD_'+coll+'_calc'] = RD
     df_DTIROI_['DTI_MD_'+coll+'_calc'] = MD
 
-plt.plot(df_DTIROI_.DTI_FA_REF1,df_DTIROI_.DTI_FA_REF1_calc,'.')
-plt.plot(plt.gca().get_xlim(),plt.gca().get_xlim(),label='Reference')
-plt.legend()
-plt.xlabel('FA PPMI')
-plt.ylabel('FA calculated (with fudge factor)')
-plt.show()
+fig,ax=plt.subplots()
+ax.plot(df_DTIROI_.DTI_FA_REF1,df_DTIROI_.DTI_FA_REF1_calc,'.')
+ax.plot(plt.gca().get_xlim(),plt.gca().get_xlim(),label='Reference')
+ax.legend()
+ax.set_xlabel('FA PPMI')
+ax.set_ylabel('FA calculated')
+fig.show()
 #* Merge PPMIMERGE and DTI
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_DTIROI_,on=Keys,how='left',suffixes=('','_DTI'))
 
@@ -1295,19 +1340,12 @@ include_MRI_volumes = True
 #* along with meta data (mostly image ID) from a couple of IDA searches
 if include_MRI_volumes:
     print('Including processed MRI')
-    ## * Preprocessed structural MRI: T1-Anatomical
-    #******************** FIX ME *******************
-    PPMI_T1_Anatomical_IDASEARCH_csv = os.path.join("/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/","PPMI-T1-Anatomical_4_06_2018.csv")
-    #PPMI_T1_Anatomical_IDASEARCH_csv = os.path.join("path/to","PPMI-T1-Anatomical_IDASEARCH.csv")
-    #****************** END FIX ME *****************
-    df_MRI_ref1 = pd.read_csv(PPMI_T1_Anatomical_IDASEARCH_csv)
+    ## * LONI IDA collection (doesn't contain visit codes)
+    df_MRI_ref1 = pd.read_csv(ppmi_t1_ida_csv)
     df_MRI_ref1.rename(index=str, columns={"Image Data ID": "ImageID", "Subject": "PATNO"},inplace=True)
     df_MRI_ref1.drop(["Type","Modality","Format","Downloaded"],axis=1,inplace=True)
-    #* Visit code as text, rather than as a number
-    #******************** FIX ME *******************
-    another_IDA_search_results_csv_for_some_reason = "/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/idaSearch_4_06_2018.csv"
-    #****************** END FIX ME *****************
-    df_MRI_ref0 = pd.read_csv(another_IDA_search_results_csv_for_some_reason)
+    ## * LONI IDA search: contains visit code (but as text, rather than as a number)
+    df_MRI_ref0 = pd.read_csv(ppmi_t1_ida_search_csv)
     df_MRI_ref0.rename(index=str, columns={"Image ID": "ImageID", "Subject ID": "PATNO", "Visit": "Visit_desc"},inplace=True)
     df_MRI_ref0.drop(["Imaging Protocol","Modality"],axis=1,inplace=True)
     #* Tidy and merge
@@ -1325,8 +1363,9 @@ if include_MRI_volumes:
     
     #* GIF volumes
     #******************** FIX ME *******************
-    df_MRI_ROIvols = pd.read_csv(os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv"))
+    df_MRI_ROIvols = pd.read_csv(ppmi_t1_gif3_csv)
     #****************** END FIX ME *****************
+    print('Taking GIF ROI names from columns 2:end of {0}'.format(ppmi_t1_gif3_csv))
     ROI_labels = df_MRI_ROIvols.columns[2:]
     ext = '.nii'
     # Extract Image IDs from filenames in GIF CSV
@@ -1456,6 +1495,7 @@ if include_MRI_volumes:
         'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
     ]
     ROI_labels_FreeSurfer = [
+        'eTIV',
         #* ROI volumes
         'lh_bankssts_volume', 'lh_caudalanteriorcingulate_volume', 'lh_caudalmiddlefrontal_volume', 
         'lh_cuneus_volume', 'lh_entorhinal_volume', 'lh_fusiform_volume',
@@ -1536,27 +1576,33 @@ if include_MRI_volumes:
         'rh_WhiteSurfArea_area'
     ]
     # ****** FIX ME ******
-    PPMI_FreeSurfer_path = data_path #os.path.join(PPMI_csv_path,'..')
-    # freesurfer_file = os.path.join(PPMI_FreeSurfer_path,'PPMI-T1-Anatomical_freesurfer5p3p0.csv')
-    freesurfer_file = os.path.join(PPMI_FreeSurfer_path,'PPMI-T1-Anatomical_freesurfer6p0p0.csv')
-    df_freesurfer = pd.read_csv(freesurfer_file,low_memory=False)
+    df_freesurfer = pd.read_csv(ppmi_t1_freesurfer_csv,low_memory=False)
     if df_freesurfer['SeriesID'].dtype == str:
         df_freesurfer['SeriesID'] = df_freesurfer['SeriesID'].map(lambda x: int(x.replace('S','')))
     if df_freesurfer['ImageID'].dtype == str:
         df_freesurfer['ImageID'] = df_freesurfer['ImageID'].map(lambda x: int(x.replace('I','')))
     if df_freesurfer['PATNO'].dtype != str:
         df_freesurfer['PATNO'] = df_freesurfer['PATNO'].map(lambda x: str(x))
-    # ****** END FIX ME ******
     
     if reorder:
-        df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID','MRI_filename'] + ROI_labels_GIF3]
+        df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID'] + ROI_labels_GIF3]
     
-    #* Join MRI and GIF: for EVENT_ID
-    df_MRI_vols = pd.merge(df_MRI_ROIvols,df_MRI_ref[['EVENT_ID','PATNO','ImageID']],on=['PATNO','ImageID'],how='left')
-    #* Join with FreeSurfer
-    df_MRI_vols = pd.merge(df_MRI_vols,df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer],on=['PATNO','ImageID'],how='left')
+    #* Join MRI_ref (IDA search) with FreeSurfer: get EVENT_ID from IDA search
+    # df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer+['filename']].rename(columns={'filename':"MRI_filename"}),
+    #                        df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
+    #                        on=['PATNO','ImageID'],
+    #                        how='left'
+    # )
+    df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer],
+                           df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
+                           on=['PATNO','ImageID'],
+                           how='left'
+    )
+    #* Join with GIF
+    df_MRI_vols = pd.merge(df_MRI_vols,df_MRI_ROIvols,on=['PATNO','ImageID'],how='left')
     #* Join PPMIMERGE and MRI_vols
     df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI_vols,on=Keys,how='left',suffixes=('','_MRI'))
+    # ****** END FIX ME ******
 else:
     print('ALERT: No MRI. If you want to include regional brain volumes (e.g., from FreeSurfer), here''s where you could be doing it.')
 
@@ -1943,13 +1989,15 @@ for k in dfs_of_interest:
     unmatched_rows_.append(unmatched_rows)
 
 # ### PPMIMERGE: remove (nearly-)empty rows from the large cross-join
-threshold = 0.9 * df_PPMIMERGE.shape[1]
+t = 0.9
+print("Removing rows having more than {0}% null values".format(np.around(t*100,0)))
+threshold = t * df_PPMIMERGE.shape[1]
 n_null = np.sum(df_PPMIMERGE.isnull(),axis=1)
 empty_rows = n_null > threshold
-plt.hist(n_null)
-a = plt.gca()
-plt.plot(threshold*np.ones([2,1]),a.get_ylim())
-plt.show()
+fig,ax = plt.subplots()
+ax.hist(n_null)
+ax.plot(threshold*np.ones([2,1]),ax.get_ylim())
+fig.show()
 
 df_PPMIMERGE_ = df_PPMIMERGE.loc[~empty_rows].copy()
 
@@ -1957,6 +2005,7 @@ df_PPMIMERGE_ = df_PPMIMERGE.loc[~empty_rows].copy()
 # Tests performed at screening usually weren't repeated at baseline. Notably:
 # - MOCA, GDSSHORT, DATSCAN, PECN, PENEURO, STAI
 # Uses `pd.DataFrame.fillna()` (NOTE: since visit order is chronological in PPMIMERGE, `SC` is before `BL` and we can forward fill - I sort below, just in case)
+print("Merging SC and BL visits, where both exist (some SC tests were repeated at BL, others were not)")
 boo = (df_PPMIMERGE_.EVENT_ID=='SC') & (~df_PPMIMERGE_.PATNO.isin(['42418R','42415R']))
 x = df_PPMIMERGE_.loc[boo,'MCATOT']
 x_PATNO = df_PPMIMERGE_.loc[boo,'PATNO']
@@ -1988,10 +2037,11 @@ df_PPMIMERGE__ = df_PPMIMERGE_.loc[df_PPMIMERGE_.EVENT_ID!='SC']
 # boo = (df_PPMIMERGE__.EVENT_ID=='BL') & (~df_PPMIMERGE__.PATNO.isin(['42418R','42415R','42357R']))
 # y = df_PPMIMERGE__.loc[boo,'MCATOT']
 # y_PATNO = df_PPMIMERGE__.loc[boo,'PATNO']
-# plt.plot(x_PATNO,x,'r+')
-# plt.hold
-# plt.plot(y_PATNO,y,'b.')
-# plt.show()
+# fig,ax = plt.subplots()
+# ax.plot(x_PATNO,x,'r+')
+# ax.hold
+# ax.plot(y_PATNO,y,'b.')
+# fig.show()
 # print(len(x_PATNO))
 # print(len(y_PATNO))
 
@@ -2069,3 +2119,4 @@ print('PPMIMERGE_.shape: {0},{1}'.format(df_PPMIMERGE_.shape[0],df_PPMIMERGE_.sh
 print('PPMIMERGE___.shape: {0},{1}'.format(df_PPMIMERGE___.shape[0],df_PPMIMERGE___.shape[1]))
 print('Number of unique PATNOs: {0}'.format(len(df_PPMIMERGE___.PATNO.unique())))
 
+print(' * * * * * * PPMI MERGE table written to {0} * * * * * * '.format(PPMIMERGE_csv))

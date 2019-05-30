@@ -1,0 +1,356 @@
+\documentclass[12pt]{elsarticle}
+\usepackage{lipsum}
+\makeatletter
+% \def\ps@pprintTitle{%
+%  \let\@oddhead\@empty
+%  \let\@evenhead\@empty
+%  \def\@oddfoot{}%
+%  \let\@evenfoot\@oddfoot}
+\def\ps@pprintTitle{%
+     \let\@oddhead\@empty
+     \let\@evenhead\@empty
+     \def\@oddfoot{\footnotesize\itshape
+       Technical note. \hfill{}Last updated: \today}%
+     \let\@evenfoot\@oddfoot}
+\makeatother
+
+\usepackage{natbib}
+\setcitestyle{authoryear,open={(},close={)}}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{verbatim}
+\hypersetup{breaklinks=true,colorlinks=true,citecolor=blue,linkcolor=red,urlcolor=blue,pdfauthor={Neil P. Oxtoby},pdftitle={Neil Oxtoby's pipeline for constructing anatomical connectomes from structural and diffusion MRI},pdfsubject={Anatomical Connectome Pipeline},pdfcreator={Neil Oxtoby via LaTeX}}
+\usepackage{listings}
+\lstset{ %
+  language=python,                % the language of the code
+  basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+  % numbers=left,                  % where to put the line-numbers
+  % numberstyle=\tiny\color{gray}, % the style that is used for the line-numbers
+  % stepnumber=2,                  % the step between two line-numbers. If it's 1, each line 
+  %                                % will be numbered
+  % numbersep=5pt,                 % how far the line-numbers are from the code
+  backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
+  showspaces=false,               % show spaces adding particular underscores
+  showstringspaces=false,         % underline spaces within strings
+  showtabs=false,                 % show tabs within strings adding particular underscores
+  frame=single,                   % adds a frame around the code
+  rulecolor=\color{black},        % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. commens (green here))
+  tabsize=2,                      % sets default tabsize to 2 spaces
+  captionpos=b,                   % sets the caption-position to bottom
+  breaklines=true,                % sets automatic line breaking
+	postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+  title=\lstname,                 % show the filename of files included with \lstinputlisting;
+                                  % also try caption instead of title
+  %keywordstyle=\color{blue},      % keyword style
+  %commentstyle=\color{dkgreen},   % comment style
+  %stringstyle=\color{mauve},      % string literal style
+  escapeinside={\%*}{*)},         % if you want to add LaTeX within your code
+  morekeywords={*,...}            % if you want to add more keywords to the set
+}
+\usepackage{dirtree}
+
+\newcommand{\citeNeil}[1]{\citep{#1}}
+\newcommand{\sMRI}{\texttt{sMRI}}
+\newcommand{\dMRI}{\texttt{dMRI}}
+\newcommand{\topFolder}{\texttt{/topFolder}}
+
+\newcommand{\AcknowledgeEuroPOND}{This project has received funding from the European Union’s \textit{Horizon 2020 research and innovation programme} under Grant Agreement No 666992.}
+\newcommand{\AcknowledgeADNI}{Data collection and sharing for this project was funded by the Alzheimer's Disease Neuroimaging Initiative (ADNI) (National Institutes of Health Grant U01 AG024904) and DOD ADNI (Department of Defense award number W81XWH-12-2-0012). ADNI is funded by the National Institute on Aging, the National Institute of Biomedical Imaging and Bioengineering, and through generous contributions from the following: AbbVie, Alzheimer’s Association; Alzheimer’s Drug Discovery Foundation; Araclon Biotech; BioClinica, Inc.; Biogen; Bristol-Myers Squibb Company; CereSpir, Inc.; Cogstate; Eisai Inc.; Elan Pharmaceuticals, Inc.; Eli Lilly and Company; EuroImmun; F. Hoffmann-La Roche Ltd and its affiliated company Genentech, Inc.; Fujirebio; GE Healthcare; IXICO Ltd.; Janssen Alzheimer Immunotherapy Research \& Development, LLC.; Johnson \& Johnson Pharmaceutical Research \& Development LLC.; Lumosity; Lundbeck; Merck \& Co., Inc.; Meso Scale Diagnostics, LLC.; NeuroRx Research; Neurotrack Technologies; Novartis Pharmaceuticals Corporation; Pfizer Inc.; Piramal Imaging; Servier; Takeda Pharmaceutical Company; and Transition Therapeutics. The Canadian Institutes of Health Research is providing funds to support ADNI clinical sites in Canada. Private sector contributions are facilitated by the Foundation for the National Institutes of Health (\url{http://www.fnih.org}). The grantee organization is the Northern California Institute for Research and Education, and the study is coordinated by the Alzheimer’s Therapeutic Research Institute at the University of Southern California. ADNI data are disseminated by the Laboratory for Neuro Imaging at the University of Southern California.}
+\newcommand{\ADNIMethodsText}{Data used in the preparation of this article were obtained from the Alzheimer’s Disease Neuroimaging Initiative (ADNI) database (\url{http://adni.loni.usc.edu}). The ADNI was launched in 2003 as a public-private partnership, led by Principal Investigator {Michael W.\ Weiner, MD}. The primary goal of ADNI has been to test whether serial magnetic resonance imaging (MRI), positron emission tomography (PET), other biological markers, and clinical and neuropsychological assessment can be combined to measure the progression of mild cognitive impairment (MCI) and early Alzheimer’s disease (AD).}
+\newcommand{\AcknowledgePPMI}{PPMI -- a public-private partnership -- is funded by the Michael J. Fox Foundation for Parkinson’s Research and funding partners, including Abbvie, Avid Pharmaceuticals, Biogen, Bristol-Meyers Squibb, Covance, GE Healthcare, Genetech, Glaxo Smith Kline, Lilly, Lundbeck, Merck, Meso Scale Discovery, Pfizer, Piramal, Roche, Servier, UCB, and Golub Capital. [list the full names of all of the PPMI funding partners found at \url{http://www.ppmi-info.org/fundingpartners}.]}
+\newcommand{\citeMRtrixGIF}{Structural connectomes were generated using tools provided in the MRtrix3 software package (\url{http://mrtrix.org}), customised to work with the Geodesic Information Flows algorithm \citeNeil{GIF} for segmentation and parcellation. The pipeline included: DWI denoising \citeNeil{Veraart2016}, pre-processing \citeNeil{Andersson2003,Andersson2016} and bias field correction \citeNeil{Tustison2010}; inter-modal registration \citeNeil{NiftyReg_rigidAffine}; % \citeNeil{Bhushan2015}
+		T1 tissue segmentation \citeNeil{GIF}; %\citeNeil{Zhang2001,Smith2002,Patenaude2011,Smith2012};
+		spherical deconvolution \citeNeil{Tournier2004,Jeurissen2014}; probabilistic tractography \citeNeil{Tournier2010} utilizing anatomically-constrained tractography \citeNeil{Smith2012} and dynamic seeding \citeNeil{Smith2015}; 
+		SIFT \citeNeil{Smith2013}; T1 parcellation \citeNeil{GIF}; %\citeNeil{TzourioMazoyer2002} or \citeNeil{Dale1999,Desikan2006} or \citeNeil{Dale1999,Destrieux2010}; 
+		robust structural connectome construction \citeNeil{Yeh2016}.}
+
+\def\Address{$^1$Progression Of Neurodegenerative Disease (POND) group, Centre for Medical Image Computing, Dept.\ of Computer Science, University College London, London, United Kingdom; \\$^{2}$VUmc, Amsterdam, Netherlands}
+\def\corrAuthor{Neil P.\ Oxtoby\\ Centre for Medical Image Computing, Dept.\ of Computer Science, University College London, Gower Street, London WC1E 6BT, United Kingdom}
+\def\corrEmail{n.oxtoby@ucl.ac.uk}
+
+% %***
+% \fntext[ADNI]{Data used in the preparation of this article were obtained from the Alzheimer’s Disease Neuroimaging Initiative (ADNI) database (\url{http://adni.loni.usc.edu}). For up-to-date information on the study, visit \href{www.adni-info.org}{www.adni-info.org}.}
+%***
+%***
+
+
+
+
+
+
+\begin{document}
+	\begin{frontmatter}
+		\title{Technical Note: Anatomical Connectome Pipeline}
+		\author{Neil P.\ Oxtoby}\ead{n.oxtoby@ucl.ac.uk}
+		\address{Progression Of Neurological Disease (POND) group, Centre for Medical Image Computing, Dept.\ of Computer Science, University College London, London, United Kingdom}
+		%\fntext[ADNI]{Data used in preparation of this article were obtained from the Alzheimer's Disease Neuroimaging Initiative (ADNI) database (\href{http://adni.loni.usc.edu}{adni.loni.usc.edu}). As such, the investigators within the ADNI contributed to the design and implementation of ADNI and/or provided data but did not participate in analysis or writing of this report. A complete listing of ADNI investigators can be found at: \url{http://adni.loni.usc.edu/wp-content/uploads/how_to_apply/ADNI_Acknowledgement_List.pdf}.}
+    \date{2017-12-21}
+		\begin{abstract}
+			My pipeline for generating Anatomical Connectivity Networks (of the brain) from structural and diffusion MRI using anatomically-constrained tractography in the software package MRtrix3.
+		\end{abstract}
+		\begin{keyword}
+			connectome \sep tractography \sep white-matter edges \sep gray-matter nodes
+		\end{keyword}
+	\end{frontmatter}
+
+\begin{quote}
+  {2017-12-21 (last updated: \today)}
+\end{quote}
+\section{Introduction}
+Neurological disorders (of the brain) disrupt brain function, resulting in cognitive impairment. For example, in Alzheimer's disease, this manifests most commonly as memory loss. Functional disruption is mediated by inflammation or neuronal degeneration, or both. However, the precise relationship between dysfunction and degeneration is not known. Such structure-function relationships can be investigated by analysing brain networks in health and disease, \emph{in vivo}, using magentic resonance imaging (MRI).
+
+Brain connectivity networks can be estimated in multiple ways, but each can be represented as a set of nodes (brain regions) and edges (``connections''), i.e., a graph. 
+Functional correlation networks (FCNs) are usually formed from so-called functional MRI (fMRI) in either resting-state, or active-task experimental settings. FCN graph nodes are brain regions, and weighted edges are derived from temporal correlations in observed activations. 
+Grey-matter (GM) Structural Covariance Networks (SCNs) are formed from structural MRI (sMRI, usually T1 MRI). SCN graph nodes are GM regions (patches or atlas-based regions), and edge weights are derived from the correlation of GM intensity/shape (or cortical thickness) between regions.
+White-matter (WM) Anatomical Connectivity Networks (ACNs) are formed from diffusion (dMRI) and sMRI, via tractography. ACN graph nodes are usually GM regions from an atlas (often the default for your chosen parcellation scheme/software), with edge weights derived from the level of WM connectivity between the nodes, as quantified in some sensible manner.
+
+In this document I give details of, and python code for, the processing steps necessary to generate WM ACNs from dMRI and sMRI. 
+I have tried to keep the code as general as possible, but will occasionally include steps specific to the data I used during development: selected data from the Alzheimer's Disease Neuroimaging Initiative (ADNI).
+
+\section{White-Matter Anatomical Connectivity Networks}
+\subsection{Pipeline}\label{sub:pipeline}
+\begin{table}[!ht]
+	\begin{center}
+	\begin{tabular}{l|l}
+		Step                  & Script                     \\ \hline\hline
+		1. Organise data      & \verb|collectScansADNI.py| \\
+		2. dMRI preprocessing & \verb|act_preprocess.py|   \\
+		3. sMRI preprocessing & \verb|act_preprocess.py|   \\
+		4. run GIF3 (cluster) & \verb|collateT1sADNI.py| $\Rightarrow$ \verb|qsubGIF()|   \\
+	\end{tabular}
+	\end{center}
+	%\caption{caption}
+	\label{label}
+\end{table}
+
+\noindent{}Organise data \\ $\Rightarrow$ dMRI preprocessing \\ $\Rightarrow$$\Rightarrow$ sMRI preprocessing \\ $\Rightarrow$$\Rightarrow$$\Rightarrow$ Tractography \& Connectome
+\begin{enumerate}
+	\item Download and organise data: see \verb|collectScansADNI.py|
+	\begin{enumerate}
+		\item Setup a group analysis folder, \topFolder{}
+		\item Download single-visit sMRI and dMRI data for all individuals into subfolders \sMRI{} and \dMRI{}.
+		\item Ensure that the filenames have matching prefixes, e.g., Subject ID
+		\item Generate a spreadsheet \topFolder\verb|/inputSpreadsheet.csv| with filepaths and identifying information. For example:\\
+		{\centering
+		\begin{tabular}{lll}
+			Subject ID, & Modality, & Path \\
+			12, & sMRI, & \verb|/topFolder/sMRI/S12_T1.nii.gz| \\
+			12, & dMRI, & \verb|/topFolder/dMRI/S12_DWI.nii.gz|
+		\end{tabular}}
+		\item Export dMRI gradient information in FSL format using MRtrix3, saving in the \dMRI{} folder (works only if the diffusion gradient information is stored in the dMRI file header): 
+\begin{lstlisting}[language=bash]
+mrinfo -export_grad_fsl /topFolder/dMRI/${dMRI_filename}_bvecs /topFolder/dMRI/${dMRI_filename}_bvals /topFolder/dMRI/${dMRI_filename}.nii.gz
+\end{lstlisting} Note: you'll also need to know the phase-encoding direction of the dMRI data. For ADNI-2, this was AP (Anterior-Posterior).
+	\end{enumerate}
+	\item dMRI Preprocessing: see \verb|act_preprocess.py| \\(requires \href{http://stnava.github.io/ANTs/}{ANTS}, MRtrix3, \href{https://fsl.fmrib.ox.ac.uk/fsl/fslwiki}{FSL}, \href{https://sourceforge.net/projects/niftyreg/files/}{NiftyReg})
+	\begin{enumerate}
+		\item Masking; Denoising; Eddy-current correction; Bias correction; etc.
+		\item Global (cohort-wide) intensity normalisation. \\ (Optional. Alternative is \verb|mtnormalise| option: after CSD.) \\
+      For a discussion of global vs individual intensity normalisation, see \href{http://mrtrix.readthedocs.io/en/latest/concepts/global_intensity_normalisation.html}{this webpage}. In the global approach, a reference FA template is formed using healthy controls, via \texttt{dwiintensitynorm} in MRtrix3. This is not ideal because it's computationally expensive (and potentially not entirely accurate) to perform the registration to a group template.
+	\end{enumerate}
+	\item sMRI Preprocessing: see \verb|act_preprocess.py| (register sMRI to dMRI) and \verb|collateT1sADNI.py| (running GIF on the cluster)
+	\begin{enumerate}
+		\item Rigid registration: sMRI to dMRI. I use NiftyReg.
+		\item Tissue Segmentation and Parcellation, e.g., using FreeSurfer. I used Geodesic Information Flows (GIF: version 2 or 3) on the ULC-CS HPC cluster (potentially also available via \href{http://cmictig.cs.ucl.ac.uk/niftyweb/program.php?p=GIF}{NiftyWeb}). \\
+			Place the parcellation files in \topFolder\verb|/sMRI_xxx| folder, where \verb|xxx| is lowercase version of the software used: \texttt{freesurfer}, \texttt{gif2}, or \texttt{gif3}. When I run GIF locally, the appropriate file is named \verb|[sMRI_basename]_NeuroMorph_Parcellation.nii.gz|, but your mileage may vary.
+	\end{enumerate}
+	\item Anatomically-Constrained Tractography (ACT) and connectome generation: 
+	\begin{enumerate}
+		\item \verb|act_pre.py| (\emph{in progress}): generate 5 Tissue Type (5TT) and WM Fibre Orientation Distribution (FOD) files
+		\begin{enumerate}
+			\item GIF3 (or GIF2) ACT customisation files need to be placed in the same locations as their counterpart FreeSurfer ACT files within the mrtrix3 folder tree:\\
+			\begin{center}
+			\begin{tabular}{c|c}
+				GIF3-specific files     & FreeSurfer file    \\ \hline
+				\verb|gif3_default.txt| & \verb|fs_default.txt|    \\ 
+				\verb|gif3.py|          & \verb|freesurfer.py|     \\ 
+				\verb|GIF32ACT*.txt|    & \verb|FreeSurfer2ACT.txt| \\ 
+			\end{tabular}\end{center} 
+			Finally, the lookup table GIF3ColourLUT.txt needs to go in \verb|GIFDB_HOME| (defined as an environment variable).
+			Alternatively, you can modify \verb|gif3.py| to point to the location, or pass the location explicitly to gif3.py (via \texttt{5ttgen} in MRtrix3).
+		\end{enumerate}
+    \item Individual intensity normalisation: \verb|mtnormalise|. \\
+      This is multi-tissue-informed intensity normalisation in the log-domain, that can be run independently on each individual. \\
+\begin{lstlisting}[language=bash]
+mtnormalise wmfod.mif wmfod_norm.mif cgm.mif cgm_norm.mif sgm.mif sgm_norm.mif csf.mif csf_norm.mif wm.mif wm_norm.mif path.mif path_norm.mif -mask mask.mif
+mrcat gm_norm.mif sgm_norm.mif wm_norm.mif csf_norm.mif lesion_norm.mif 5tt_norm.mif -axis 3\end{lstlisting}
+      \textbf{TO DO:} Work out how to reference the tissue types within the 5TT image, then adjust this command. \\
+      I suspect something like this will work (double check the order in \verb|5ttgen|):
+\begin{lstlisting}[language=bash]
+mrconvert input.mif -coord 3 1 cGM.mif
+mrconvert input.mif -coord 3 2 sGM.mif
+mrconvert input.mif -coord 3 3 cWM.mif
+mrconvert input.mif -coord 3 4 CSF.mif
+mrconvert input.mif -coord 3 5 path.mif\end{lstlisting}
+      Use \verb|5ttcheck| to check.
+		\item Transfer (normalised) 5TT and WMFOD files to a HPC cluster
+		\item \verb|tckgen_cluster_adni.py|: ACT on the cluster (script works for Sun Grid Engine (SGE) using qsub). I generate 32M tracts, reduce this to 16M, then SIFT down to 4M.
+		\item Transfer the tractograms from the cluster into the \topFolder\texttt{/tractograms} folder
+		\item \verb|act_post.py| (\emph{in progress}): connectome generation via MRtrix3's \texttt{tck2connectome}
+	\end{enumerate}
+\end{enumerate}
+
+% \begin{table}[ht!]
+% 	\caption{My scripts}
+% 	\begin{tabular}{c|c|c}
+% 		Steps & Script & Notes \\\hline\hline
+% 		1(b)--(e) & \verb|collectScansADNI.py| & \begin{tabular}{l}ADNI-specific.\\ Also extracts bval/bvec from xmls\\that accompany nifti files.\end{tabular} \\\hline
+% 		2, 3(a) & \verb|act_preprocess.py| & \begin{tabular}{l}Requires ANTS, MRtrix3, \\FSL, NiftyReg \end{tabular}\\\hline
+% 			\hline & To Do & \\ \hline
+% 		2(b) & (above)  & \\\hline
+% 		4(a) & \verb|act_pre.py|  & 5TT and WMFOD files \\\hline
+% 		4(c) & \verb|tckgen_cluster_adni.py| & Do this on a cluster \\\hline
+% 		5    & \verb|act_post.py| & Connectome \\\hline
+% 	\end{tabular}
+% \end{table}
+
+
+\subsection{Final file structure}\label{sub:final_file_structure}
+Finally, you should have a directory tree that looks something like this:
+
+\dirtree{%
+.1 topFolder.
+.2 act.
+.3 5TT and WMFOD files.
+.2 act\_post.py.
+.2 act\_preprocess.py.
+.2 act\_pre.py.
+.2 connectomes\_X.
+.3 TSV files containing connectivity matrices.
+.2 dMRI.
+.3 dMRI files.
+.2 dMRI\_masks.
+.3 dMRI mask files.
+.2 dMRI\_preprocessed.
+.3 preprocessed dMRI files.
+.2 inputSpreadsheet.csv.
+.2 sMRI.
+.3 sMRI files.
+.2 sMRI\_reg.
+.3 sMRI files registered to dMRI.
+.2 sMRI\_reg\_xxx.
+.3 parcellated sMRI\_reg files using xxx (freesurfer/gif2/gif3).
+.2 tractograms.
+.3 Probably want to delete these as they are massive.
+}
+% subsection final_file_structure (end)
+
+\newpage
+\section*{Grey-Matter Structural Covariance Networks}
+I haven't yet implemented this. SCNs are built by correlating GM intensity between patches, or cortical thickness between regions. Betty Tijms has MATLAB code on GitHub, but I haven't played with it extensively: {\small\url{https://github.com/bettytijms/Single_Subject_Grey_Matter_Networks}}
+
+Tractography is not required, but interpretation of such ``structural connectivity'' is difficult (as opposed to the anatomical connectivity estimated by tractography). The idea is that if regions/patches are somehow morphologically similar, then they are in some sense connected via this ``structural covariance''.
+
+\section*{Functional Correlation Networks}
+Not implemented. FCNs are built by correlating (resting-state/task-free) fMRI activation time-series (possibly smoothed or averaged) between voxels/patches/regions. From these types of analyses we've got the ``Default Mode Network,'' ``Salience Network,'' and others. 
+
+As with GM SCNs, difficult to interpret these so-called ``functional connectivity'' networks, at least in terms of mechanistic disease progression models.
+
+
+% \subsection{Methods}
+% We estimated individual structural connectomes from WM connectivity density between GM regions of interest, i.e., the number of WM tracts between regions, normalised by the maximum number. Inclusion criteria: we sought balanced clinical groups (EMCI, LMCI, pAD) that were well-matched for age (Mann-Whitney U test of ``equal medians'' null hypothesis); each participant must have both diffusion-weighted and structural T1 MRI at a single visit (denoted baseline), plus a followup structural MRI processed by ADNI using FreeSurfer. Final numbers: 31 EMCI, 34 LMCI, 37 AD. Structural connectomes were generated using tools provided in the MRtrix3 software package (\url{http://mrtrix.org}). For a full description of the full-brain tractography pipeline, including appropriate citations, see \citeNeil{Oxtoby2017c}.
+% %The pipeline included: DWI denoising \citeNeil{Veraart2016}, pre-processing \citeNeil{Andersson2003,Andersson2016} and bias field correction \citeNeil{Tustison2010}; inter-modal registration \citeNeil{NiftyReg_rigidAffine}; T1 tissue segmentation \citeNeil{Dale1999,Desikan2006}; spherical deconvolution \citeNeil{Tournier2004,Jeurissen2014}; probabilistic tractography \citeNeil{Tournier2010} utilizing anatomically-constrained tractography \citeNeil{Smith2012} and dynamic seeding \citeNeil{Smith2015}; SIFT \citeNeil{Smith2013}; T1 parcellation \citeNeil{Dale1999,Desikan2006,Reuter2012}; robust structural connectome construction \citeNeil{Yeh2016}.
+% With the connectomes generated at baseline, we then queried the LONI IDA to identify the next available structural MRI scan nearest to one year later ($0.94\pm0.25$ years) and downloaded the corresponding regional GM tissue volume spreadsheets calculated by ADNI using FreeSurfer \citeNeil{Dale1999,Desikan2006}. %add Reuter2012 if FS longitudinal
+% Omitting individuals from the CN group, for each GM region in the atlas used by FreeSurfer, stepwise linear regression models were fit to investigate correlations between baseline WM-connectivity (to other GM regions, i.e., a single row of the connectome), and annualised change in GM tissue volume.
+%
+% \section*{Results}
+% Figure \ref{figure1} shows the connectome nodes (horizontal axis) whose connectivity (edge weights) to selected GM ROIs (vertical axis) was predictive of annualised change in that GM volume.
+%
+% Figure \ref{figure2} shows the most frequent predictors (involved in at least 4 stepwise linear regressions). First was a non-zero intercept (Constant). Temporal lobe is heavily involved. Not much else to say, really.
+%
+% \begin{figure}[!ht]
+% 	\begin{center}
+% 		\includegraphics[width=0.9\columnwidth,clip=true,trim=0 0 0 0]{../Analysis/grid.pdf}
+% 	\end{center}
+% 	\caption{\label{figure1}(\emph{I will make the squares sharper, or replace with a sexy brain picture: sum down the columns of this grid and colour the predictive ROIs correspondingly: see figure \protect\ref{figure2}}) Stepwise linear regression grid: a black square shows connectome nodes (horizontal axis; all 84 GM ROIs) whose edge-weight connectivity to selected GM ROIs (vertical axis) was predictive of annualised change in that ROI's GM volume.}
+% \end{figure}
+%
+% \begin{figure}[!ht]
+% 	\begin{center}
+% 		\includegraphics[width=0.9\columnwidth,clip=true,trim=0 0 0 0]{../Analysis/gtrthan3.pdf}
+% 	\end{center}
+% 	\caption{\label{figure2} \emph{Sum down the columns of the grid in \protect\ref{figure1}}}
+% \end{figure}
+%
+%
+%
+% \section*{Conclusion}
+% Beyond heavy involvement of connectome nodes in the temporal lobe, there's no obvious pattern of how anatomical connectivity can predict neurodegeneration, just that it can. Maybe a sexy brain picture would help.
+%
+% Connectomes are cool.
+%
+% I need more time to do research.
+
+
+\newpage
+\appendix
+\section*{Code referenced in this document}
+\begin{itemize}
+	\item \verb|collectScansADNI.py|
+	\item \verb|act_preprocess.py|
+	\item \verb|act_pre.py|
+	\item \verb|tckgen_cluster_adni.py|
+	\item \verb|act_post.py|
+	\item \verb|gif3_default.txt|
+	\item \verb|gif3.py|
+	\item \verb|GIF32ACT.txt|
+	\item \verb|GIF3ACT_sgm_amyg_hipp.txt|
+	\item \verb|GIF3ColourLUT.txt|
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+%
+% \section{Code: collectScansADNI.py}\label{sec:collectScansADNI.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: act\_preprocess.py}\label{sec:act_preprocess.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: act\_pre.py}\label{sec:act_pre.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: tckgen\_cluster\_adni.py}\label{sec:tckgen_cluster_adni.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: act\_post.py}\label{sec:act_post.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: gif3\_default.txt}\label{sec:gifX_default.txt}
+%   \begin{lstlisting}
+% 	\end{lstlisting}
+% \section{Code: gif3.py}\label{sec:gifX.py}
+%   \begin{lstlisting}[language=python]
+% 	\end{lstlisting}
+% \section{Code: GIF32ACT.txt}\label{sec:GIF2ACTvX.txt}
+%   \begin{lstlisting}
+% 	\end{lstlisting}
+% \section{Code: GIF3ACT\_sgm\_amyg\_hipp.txt}\label{sec:GIF2ACTvX_sgm_amyg_hipp.txt}
+%   \begin{lstlisting}
+% 	\end{lstlisting}
+% \section{Code: GIF3ColourLUT.txt}\label{sec:GIFColourLUTvX.txt}
+%   \begin{lstlisting}
+% 	\end{lstlisting}
+
+
+
+
+
+
+% \bibliographystyle{plainnat}
+% \bibliography{/Users/noxtoby/Documents/Research/Bibliography/DiseaseProgression,/Users/noxtoby/Documents/Research/Bibliography/BiomarkerDynamics,/Users/noxtoby/Documents/Research/Bibliography/OxBib2017,/Users/noxtoby/Documents/Research/Bibliography/OxBib2016,/Users/noxtoby/Documents/Research/Bibliography/OxBib2014,/Users/noxtoby/Documents/Research/Bibliography/OxBib2013,/Users/noxtoby/Documents/Research/Bibliography/OxBib2012,/Users/noxtoby/Documents/Research/Bibliography/MRtrixACT}
+
+\end{document}
+
+
