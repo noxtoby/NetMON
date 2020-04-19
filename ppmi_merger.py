@@ -28,7 +28,7 @@ Instructions:
   Set some variable names
 """
 __author__ = "Neil P Oxtoby"
-__copyright__ = "Copyright 2015-2019, Neil P Oxtoby"
+__copyright__ = "Copyright 2015-2020, Neil P Oxtoby"
 __credits__ = ["Neil Oxtoby", "Coffee", "Biomarkers Across Neurodegenerative Diseases"]
 __license__ = "TBC"
 __version__ = "1.0"
@@ -40,19 +40,19 @@ __python_version__ = "3.5.2"
 import os
 #******** FIX ME **********
 data_path = os.path.join('path','to','PPMI','Data')
-data_path = '/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data'
-PPMI_csv_path = os.path.join(data_path,'CSV')
-PPMI_csv_path = os.path.join(PPMI_csv_path,'2019-03-28')
+data_path = '/Users/noxtoby/Documents/Research/Personal/20200206-POPS_PD_Subtypes/data/PPMI'
+PPMI_csv_path = os.path.join(data_path,'study')
+PPMI_csv_path = os.path.join(PPMI_csv_path,'2020-04-10')
 #****** END FIX ME ********
 
 #* Your image collection, e.g., T1-anatomical
-wd = "/Users/noxtoby/Documents/Research/UCLPOND/Projects/201803-PPMI-EBM/Data/"
-ppmi_t1_ida_csv = os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019.csv")
+wd = os.path.join(data_path,'imaging')
+ppmi_t1_ida_csv = os.path.join(wd,"PPMI-NonGenetic-T1_bl_4_14_2020.csv")
 #* Corresponding CSV from the IDA search => gives visit codes
-ppmi_t1_ida_search_csv = os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019_idaSearch.csv")
+ppmi_t1_ida_search_csv = ppmi_t1_ida_csv.replace('.csv','_idaSearch.csv') #os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019_idaSearch.csv")
 
 #* Processed image data
-ppmi_t1_gif3_csv = os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv")
+ppmi_t1_gif3_csv = ppmi_t1_ida_csv.replace('.csv','_gif3.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv")
 ppmi_t1_freesurfer_csv = ppmi_t1_ida_csv.replace('.csv','_freesurfer6p0p0.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_freesurfer6p0p0.csv")
 
 # ## Notes on PPMI
@@ -94,7 +94,10 @@ ppmi_t1_freesurfer_csv = ppmi_t1_ida_csv.replace('.csv','_freesurfer6p0p0.csv') 
 #     - AVx are unscheduled telephone AV-133; 
 #     - PW is premature withdrawal; 
 #     - Txx telephone contact;
-#     - V01-04: Months 3/6/9/12; V05-V12: six-monthly 18 to 60; V13-V15: months 72,84,96
+#     - V01-04: Months 3/6/9/12;
+#     - V05-V12: six-monthly 18 to 60;
+#     - V13-V15: months 72,84,96;
+#     - V16-V20: annually months 108 to 156;
 #     - SCBL: screening/baseline combined;
 #     - RS1: rescreen;
 #     - Xxx: Transfer event
@@ -126,9 +129,9 @@ def remove_duplicates(df, ID='PATNO', keyColumns=['PATNO', 'EVENT_ID', 'TYPE', '
     df_sorted = df.sort_values(keyColumns + [dateColumn], ascending = False)
     df_len = len(df_sorted)
     # Key columns for identifying retests:
-    df_sorted_keyCols = df_sorted[keyColumns]
+    df_sorted_keyCols = df_sorted[keyColumns].copy()
     # Step through the sorted list, line by line.
-    # If the columns match up, only keep the newest result.
+    # If the columns match up, only keep the newest (latest) result.
     # rowsRetained stores the rows to be kept (in the sorted data frame).
     rows_retained = []
     rows_removed = []
@@ -160,7 +163,7 @@ def unstack_df(df_tall,idCols_Subject_Visit,tallCol_Name_Value):
         id_is_str = False
     df_tall_pivot = df_tall.copy()
     df_tall_pivot['ID'] = df_tall_pivot[id_].map(str) + '_' + df_tall_pivot[vis_].map(str)
-    df_tall_pivot = df_tall_pivot.pivot(index='ID',columns=tall_name,values=tall_value)
+    df_tall_pivot = df_tall_pivot.pivot_table(index='ID',columns=tall_name,values=tall_value)
     df_tall_pivot = pd.DataFrame(df_tall_pivot.to_records())
     if id_is_str:
         df_tall_pivot[id_] = df_tall_pivot['ID'].map(lambda x: x.split('_')[0])
@@ -222,9 +225,9 @@ for k in range(0,len(PPMI_tables)):
     nom = os.path.basename(PPMI_tables[k])
     nom = nom.replace('.csv','').replace('-','_').replace('+','_').replace(',','') # remove hyphen, plus, comma
     if any('PATNO' == PPMI_df[k].columns):
-        PPMI_df[k].PATNO = PPMI_df[k].PATNO.map(str)
+        PPMI_df[k]['PATNO'] = PPMI_df[k]['PATNO'].astype(str)
     if any('SUBJECT_NUMBER' == PPMI_df[k].columns):
-        PPMI_df[k].PATNO = PPMI_df[k].SUBJECT_NUMBER.map(str)
+        PPMI_df[k]['PATNO'] = PPMI_df[k]['SUBJECT_NUMBER'].astype(str)
     PPMI_df_names.append(nom)
     #print('{0}\n - {1}'.format(PPMI_df_names[-1],PPMI_df[k].columns.values))
 
@@ -329,7 +332,7 @@ df_RANDOM_enrolled = pd.merge(df_RANDOM_enrolled,
                               df_SOCIOECO[['PATNO','HANDED','EDUCYRS']].sort_values('PATNO',axis=0),
                               on='PATNO',suffixes=['_Random','_SocioEco'])
 PATNO = df_RANDOM_enrolled.PATNO
-df_RANDOM_enrolled
+# df_RANDOM_enrolled
 
 # ### Data Preparation step 2: Tables that need dates
 # #### 2.1 `BIOANALYS`
@@ -341,14 +344,15 @@ df_RANDOM_enrolled
 # 5. Convert long format to semi-wide: one column per `TESTNAME`, populated by `TESTVALUE`
 Bio_n = np.where([1 if n=="Current_Biospecimen_Analysis_Results" else 0 for n in PPMI_df_names])[0][0]
 df_BIO = PPMI_df[Bio_n].copy()
-df_BIO.PI_INSTITUTION = df_BIO.PI_INSTITUTION.str.replace("’","") #* Annoying weirdly-encoded apostrophe
-df_BIO.PATNO = df_BIO.PATNO.map(str)
+df_BIO['PI_INSTITUTION'] = df_BIO['PI_INSTITUTION'].str.replace("’","") #* Annoying weirdly-encoded apostrophe
+df_BIO.PATNO = df_BIO['PATNO'].astype(str)
 
-#*** 1. Translate CLINICAL_EVENT to EVENT_ID
+#*** 1. Translate CLINICAL_EVENT to EVENT_ID: FIXME: May need to add future visit codes as the study continues
 event_list = ['SC', 'BL', 'SCBL', 
-              'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09',
-              'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'PW', 'ST', 
-              'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 'UT1']
+              'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 
+              'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 
+              'PW', 'ST', 
+              'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 'UT1', 'UT2', 'UT3', 'UT4']
 #** EVENT_ID descriptions
 event_desc = []
 for k in range(len(event_list)):
@@ -372,12 +376,15 @@ df_BIOLAB = df_BIO_.merge(df_LAB[Keys+['INFODT','PDMEDYN']],how='left',on=Keys,s
 
 #*** 3. Remove earlier Bioanalyses that were reprocessed, and also remove rows: DNA, RNA
 df_BIOLAB = df_BIOLAB.drop(['PI_INSTITUTION','PI_NAME','PROJECTID','update_stamp'],axis=1) # remove some columns for convenience
-df_BIOLAB.TYPE = df_BIOLAB.TYPE.str.replace('Cerebrospinal fluid','CSF') # Recode to CSF
+df_BIOLAB['TYPE'] = df_BIOLAB['TYPE'].str.replace('Cerebrospinal fluid','CSF') # Recode to CSF
 df_BIOLAB_ = df_BIOLAB[(~df_BIOLAB.TYPE.isin(['DNA','RNA'])) & 
                        (df_BIOLAB.TESTNAME != 'ApoE Genotype') ].copy() # remove DNA, RNA rows (except APOE genotype)
 keyColumns = Keys + ['TYPE','TESTNAME']
-dateColumn = 'RUNDATE'
-df_BIOLAB_, rowsRemoved, rowsRetained = remove_duplicates( df_BIOLAB_, 'PATNO', keyColumns, dateColumn)
+dateColumn = 'INFODT' #'RUNDATE'
+
+# df_BIOLAB_2, rowsRemoved, rowsRetained = remove_duplicates( df_BIOLAB_, ID='PATNO', keyColumns=keyColumns, dateColumn=dateColumn)
+df_BIOLAB_sorted = df_BIOLAB_.sort_values(by=keyColumns+[dateColumn],ascending=True)
+df_BIOLAB_unique = df_BIOLAB_sorted.drop_duplicates(subset=keyColumns,keep='last')
 
 #*** 4. Convert TESTVALUE to numeric (removes 'below detection limit', etc.)
 TESTVALUE_dict = {
@@ -390,16 +397,31 @@ TESTVALUE_dict = {
     '<200':200, '>1700':1700,
     # tTau
     '<80':80,
+    # IL-6
+    '<1.5': 1.5,
     # Dopamine
     '<LOD':0,
+    # 3,4-Dihydroxyphenylalanine (DOPA)
+    '>ULOQ': '', # 19.3
+    # 3-Methoxytyrosine
+    '>ULOQ': '', # 300
+    # NfL
+    '>1997': 1997,
+    # others
+    'insufficientvolume': '',
+    #'5907 +/- 39': 5907, '3595+/-50': 3595,'2160 +/- 50': 2160, '3024 +/-10':3024,
     # ApoE Genotype
     'e2/e2':'22', 'e2/e4':'24', 'e3/e2':'32', 'e3/e3':'33', 'e4/e3':'43', 'e4/e4':'44'}
-df_BIOLAB_["TESTVALUE"].replace(TESTVALUE_dict, inplace=True)
+df_BIOLAB_unique["TESTVALUE"].replace(to_replace=TESTVALUE_dict,inplace=True)
+df_BIOLAB_unique.loc[:,"TESTVALUE"] = df_BIOLAB_unique["TESTVALUE"].astype(str).map(lambda x: x.replace(' ','').split('+/-')[0].replace('<','').replace('>','').replace('insufficientvolume',''))
+df_BIOLAB_unique.loc[:,"TESTVALUE"] = df_BIOLAB_unique["TESTVALUE"].replace('','nan').map(float)
+
+#* New visit key for unstacking: EVENT_ID + INFODT + on/off meds
 s = '*'
-df_BIOLAB_['key'] = df_BIOLAB_['EVENT_ID'].map(str) +s+ df_BIOLAB_['INFODT'].map(str) +s+ df_BIOLAB_['PDMEDYN'].map(str)
+df_BIOLAB_unique.loc[:,'key'] = df_BIOLAB_unique['EVENT_ID'].map(str) +s+ df_BIOLAB_unique['INFODT'].map(str) +s+ df_BIOLAB_unique['PDMEDYN'].map(str)
 
 #*** 5. Convert long to semi-wide format: pivot on TESTNAME,TESTVALUE
-df_BIOLAB_SemiWide = unstack_df(df_BIOLAB_,['PATNO','key'],['TESTNAME','TESTVALUE'])
+df_BIOLAB_SemiWide = unstack_df(df_BIOLAB_unique,idCols_Subject_Visit=['PATNO','key'],tallCol_Name_Value=['TESTNAME','TESTVALUE'])
 df_BIOLAB_SemiWide['EVENT_ID'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[0])
 df_BIOLAB_SemiWide['INFODT'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[1])
 df_BIOLAB_SemiWide['PDMEDYN'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[2])
@@ -452,12 +474,13 @@ def calculate_scores_MOCA(df_MOCA):
     """
     Calculates MOCA subscores by summing the relevant questions:
     
-    MOCA_visuospatial = MCAALTTM + MCACUBE + MCACLCKC + MCACLCKN + MCACLCKH
-    MCOA_naming = MCALION + MCARHINO + MCACAMEL
-    MCOA_attention = MCAFDS + MCABDS + MCAVIGIL + MCASER7
-    MOCA_language = MCASNTNC + MCAVF
-    MOCA_delayed_recall = MCAREC1 + MCAREC2 + MCAREC3 + MCAREC4 + MCAREC5
-    MOCA_orientation = MCADATE + MCAMONTH + MCAYR + MCADAY + MCAPLACE + MCACITY
+    MOCA_Visuospatial = MCAALTTM + MCACUBE + MCACLCKC + MCACLCKN + MCACLCKH
+    MCOA_Naming = MCALION + MCARHINO + MCACAMEL
+    MCOA_Attention = MCAFDS + MCABDS + MCAVIGIL + MCASER7
+    MOCA_Language = MCASNTNC + MCAVF
+    MOCA_DelayedRecall = MCAREC1 + MCAREC2 + MCAREC3 + MCAREC4 + MCAREC5
+    MOCA_Orientation = MCADATE + MCAMONTH + MCAYR + MCADAY + MCAPLACE + MCACITY
+    MOCA_Letter_Fluency = MCAVFNUM
     
     Returns a list of added column names
     """
@@ -467,6 +490,7 @@ def calculate_scores_MOCA(df_MOCA):
     cols_language = ['MCASNTNC','MCAVF']
     cols_recall = ['MCAREC1','MCAREC2','MCAREC3','MCAREC4','MCAREC5']
     cols_orientation = ['MCADATE','MCAMONTH','MCAYR','MCADAY','MCAPLACE','MCACITY']
+    cols_letter_fluency = ['MCAVFNUM']
     
     df_MOCA['MOCA_Visuospatial'] = df_MOCA[cols_visuospatial].sum(axis=1)
     df_MOCA['MOCA_Naming'] = df_MOCA[cols_naming].sum(axis=1)
@@ -474,8 +498,9 @@ def calculate_scores_MOCA(df_MOCA):
     df_MOCA['MOCA_Language'] = df_MOCA[cols_language].sum(axis=1)
     df_MOCA['MOCA_DelayedRecall'] = df_MOCA[cols_recall].sum(axis=1)
     df_MOCA['MOCA_Orientation'] = df_MOCA[cols_orientation].sum(axis=1)
+    df_MOCA['MOCA_Letter_Fluency'] = df_MOCA[cols_letter_fluency].values
     
-    return ['MOCA_Visuospatial','MOCA_Naming','MOCA_Attention','MOCA_Language','MOCA_DelayedRecall','MOCA_Orientation']
+    return ['MOCA_Visuospatial','MOCA_Naming','MOCA_Attention','MOCA_Language','MOCA_DelayedRecall','MOCA_Orientation','MOCA_Letter_Fluency']
 
 def calculate_scores_GDSSHORT(df_GDSSHORT):
     """
@@ -498,7 +523,7 @@ def calculate_scores_GDSSHORT(df_GDSSHORT):
     
     # Check for at least 12 non-missing answers, otherwise NaN
     na_rows = (np.logical_not(np.isnan(df_GDSSHORT[negative_questions + positive_questions])).sum(axis=1) < 12)
-    df_GDSSHORT.set_value(na_rows,'GDS_TOT',np.nan)
+    df_GDSSHORT.loc[na_rows.values,'GDS_TOT'] = np.nan
     
     return ['GDS_TOT']
 
@@ -521,18 +546,18 @@ def calculate_scores_SCOPAAUT(df_SCOPAAUT):
     sexual_columns = df_SCOPAAUT[[ 'SCAU22', 'SCAU23', 'SCAU24', 'SCAU25']].copy().replace([9],[0])
     
     # Sum total for each SCOPA-AUT subscale
-    df_SCOPAAUT['SCOPAAUT_gastrointestinal'] = df_SCOPAAUT[[ 'SCAU1', 'SCAU2', 'SCAU3', 'SCAU4', 'SCAU5', 'SCAU6', 'SCAU7' ]].sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_urinary'] = urinary_columns.sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_cardiovascular'] = df_SCOPAAUT[[ 'SCAU14', 'SCAU15', 'SCAU16' ]].sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_thermoregulatory'] = df_SCOPAAUT[[ 'SCAU17', 'SCAU18', 'SCAU20', 'SCAU21' ]].sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_pupillomotor'] = df_SCOPAAUT[[ 'SCAU19' ]].sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_sexual'] = sexual_columns.sum(axis=1)
-    df_SCOPAAUT['SCOPAAUT_TOT'] = df_SCOPAAUT[['SCOPAAUT_gastrointestinal', 
-                                               'SCOPAAUT_urinary', 
-                                               'SCOPAAUT_cardiovascular', 
-                                               'SCOPAAUT_thermoregulatory', 
-                                               'SCOPAAUT_pupillomotor', 
-                                               'SCOPAAUT_sexual']].sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_gastrointestinal'] = df_SCOPAAUT[[ 'SCAU1', 'SCAU2', 'SCAU3', 'SCAU4', 'SCAU5', 'SCAU6', 'SCAU7' ]].sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_urinary'] = urinary_columns.sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_cardiovascular'] = df_SCOPAAUT[[ 'SCAU14', 'SCAU15', 'SCAU16' ]].sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_thermoregulatory'] = df_SCOPAAUT[[ 'SCAU17', 'SCAU18', 'SCAU20', 'SCAU21' ]].sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_pupillomotor'] = df_SCOPAAUT[[ 'SCAU19' ]].sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_sexual'] = sexual_columns.sum(axis=1)
+    df_SCOPAAUT.loc[:,'SCOPAAUT_TOT'] = df_SCOPAAUT[['SCOPAAUT_gastrointestinal', 
+                                                     'SCOPAAUT_urinary', 
+                                                     'SCOPAAUT_cardiovascular', 
+                                                     'SCOPAAUT_thermoregulatory', 
+                                                     'SCOPAAUT_pupillomotor', 
+                                                     'SCOPAAUT_sexual']].sum(axis=1)
     return ['SCOPAAUT_gastrointestinal','SCOPAAUT_urinary','SCOPAAUT_cardiovascular','SCOPAAUT_thermoregulatory','SCOPAAUT_pupillomotor','SCOPAAUT_sexual','SCOPAAUT_TOT']
 
 def calculate_scores_STAI(df_STAI):
@@ -622,7 +647,7 @@ def calculate_scores_REMSLEEP(df_REMSLEEP):
     
     # Missing values cause the total score to be missing
     m = np.isnan(df_REMSLEEP[cols_sum + cols_neuro]).any(axis=1)
-    df_REMSLEEP.set_value(m,'RBD_TOT',np.nan)
+    df_REMSLEEP.loc[m.values,'RBD_TOT'] = np.nan
     
     return ['RBD_TOT']
 
@@ -646,7 +671,7 @@ def calculate_scores_UPSIT(df_UPSIT):
     rows_equal_to_zero = (df_UPSIT[UPSIT_cols]==0).any(axis=1)
     rows_missing = np.isnan(df_UPSIT[UPSIT_cols]).any(axis=1)
     #df_UPSIT.set_value(rows_equal_to_zero | rows_missing,'UPSIT_TOT',np.nan)
-    df_UPSIT.set_value(rows_missing,'UPSIT_TOT',np.nan)
+    df_UPSIT.loc[rows_missing.values,'UPSIT_TOT'] = np.nan
     
     return ['UPSIT_TOT']
 
@@ -1001,7 +1026,12 @@ df_subjects = df_subjects[['PATNO', 'APPRDX_enrol', 'APPRDX_current', PDDURAT, '
                           ]]
 
 #*** 4.2 Visits table (Selected visits only - NB: All visits can be obtained as EVENT_IDs_all = df_EVENT_ID.CODE)
-EVENT_IDs = ['SC', 'SCBL', 'RS1', 'BL', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'ST', 'PW', 'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 'UT1']
+EVENT_IDs = ['SC', 'SCBL', 'RS1', 'BL', 
+             'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 
+             'V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 
+             'ST', 'PW', 
+             'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 
+             'UT1', 'UT2', 'UT3', 'UT4']
 df_visits = pd.DataFrame(data={'EVENT_ID':EVENT_IDs})
 
 #*** 4.3 Create massive dataframe for all individuals and visits (can downsize it later)
@@ -1340,19 +1370,19 @@ include_MRI_volumes = True
 #* along with meta data (mostly image ID) from a couple of IDA searches
 if include_MRI_volumes:
     print('Including processed MRI')
-    ## * LONI IDA collection (doesn't contain visit codes)
+    ## * LONI IDA collection (should contain visit codes)
     df_MRI_ref1 = pd.read_csv(ppmi_t1_ida_csv)
     df_MRI_ref1.rename(index=str, columns={"Image Data ID": "ImageID", "Subject": "PATNO"},inplace=True)
     df_MRI_ref1.drop(["Type","Modality","Format","Downloaded"],axis=1,inplace=True)
     ## * LONI IDA search: contains visit code (but as text, rather than as a number)
     df_MRI_ref0 = pd.read_csv(ppmi_t1_ida_search_csv)
     df_MRI_ref0.rename(index=str, columns={"Image ID": "ImageID", "Subject ID": "PATNO", "Visit": "Visit_desc"},inplace=True)
-    df_MRI_ref0.drop(["Imaging Protocol","Modality"],axis=1,inplace=True)
+    df_MRI_ref0.drop(["Imaging Protocol"],axis=1,inplace=True) #df_MRI_ref0.drop(["Imaging Protocol","Modality"],axis=1,inplace=True)
     #* Tidy and merge
-    df_MRI_ref0 = df_MRI_ref0[['PATNO', 'ImageID', 'Visit_desc', 'Study Date', 'Research Group', 'Description', ]]
+    df_MRI_ref0 = df_MRI_ref0[['PATNO', 'ImageID', 'Visit_desc', 'Study Date', 'Research Group', 'Description' ]]
     df_MRI_ref1 = df_MRI_ref1[['PATNO', 'ImageID', 'Visit', 'Acq Date' ]]
     df_MRI_ref = pd.merge(df_MRI_ref0,df_MRI_ref1,on=['PATNO','ImageID'])[['PATNO', 'ImageID', 'Visit', 'Visit_desc', 'Study Date', 'Research Group', 'Description']]
-    df_MRI_ref['PATNO'] = df_MRI_ref['PATNO'].apply(lambda x: str(x))
+    df_MRI_ref['PATNO'] = df_MRI_ref['PATNO'].astype(str)
     
     #* Generate EVENT_ID
     df_MRI_ref["EVENT_ID"] = df_MRI_ref.Visit_desc.map({
@@ -1362,138 +1392,143 @@ if include_MRI_volumes:
         'Unscheduled Visit 01':'UT01', 'Unscheduled Visit 02':'UT02'})
     
     #* GIF volumes
+    include_GIF = False
     #******************** FIX ME *******************
-    df_MRI_ROIvols = pd.read_csv(ppmi_t1_gif3_csv)
-    #****************** END FIX ME *****************
-    print('Taking GIF ROI names from columns 2:end of {0}'.format(ppmi_t1_gif3_csv))
-    ROI_labels = df_MRI_ROIvols.columns[2:]
-    ext = '.nii'
-    # Extract Image IDs from filenames in GIF CSV
-    for k in range(len(df_MRI_ROIvols.filename)):
-        SI = df_MRI_ROIvols.filename[k].strip(ext).split("_")
-        series_id = SI[-2][1:]
-        image_id = SI[-1][1:]
-        df_MRI_ROIvols.set_value(k,"PATNO",SI[1])
-        df_MRI_ROIvols.set_value(k,"SeriesID",series_id)
-        df_MRI_ROIvols.set_value(k,"ImageID",image_id)
-    df_MRI_ROIvols['PATNO'] = df_MRI_ROIvols['PATNO'].apply(lambda x: str(x))
-    df_MRI_ROIvols.ImageID = pd.to_numeric(df_MRI_ROIvols.ImageID,errors='coerce')
-    df_MRI_ROIvols.SeriesID = pd.to_numeric(df_MRI_ROIvols.SeriesID,errors='coerce')
-    df_MRI_ROIvols.rename(columns={'filename':'MRI_filename'},inplace=True)
-    # Optionally Reorder columns
-    reorder = False
-    ROI_labels_GIF2 = [
-        '3rd Ventricle','3rd Ventricle (Posterior part)','4th Ventricle','5th Ventricle',
-        'Right Inf Lat Vent','Left Inf Lat Vent','Right Lateral Ventricle','Left Lateral Ventricle',
-        'Right Ventral DC','Left Ventral DC','Pons','Brain Stem',
-        'Left Basal Forebrain','Right Basal Forebrain',
-        'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
-        'Right Caudate','Left Caudate',
-        'Right Hippocampus','Left Hippocampus',
-        'Right Pallidum','Left Pallidum','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
-        'Right Cun cuneus','Left Cun cuneus',
-        'Right Cerebellum Exterior','Left Cerebellum Exterior',
-        'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
-        'Right Cerebellum White Matter','Left Cerebellum White Matter','Right Cerebral Exterior','Left Cerebral Exterior',
-        'Right Cerebral White Matter','Left Cerebral White Matter',
-        'Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
-        'Right AIns anterior insula','Left AIns anterior insula',
-        'Right AOrG anterior orbital gyrus','Left AOrG anterior orbital gyrus',
-        'Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex','Left Calc calcarine cortex',
-        'Right CO central operculum','Left CO central operculum',
-        'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
-        'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
-        'Right GRe gyrus rectus','Left GRe gyrus rectus',
-        'Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
-        'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus',
-        'Right LiG lingual gyrus','Left LiG lingual gyrus',
-        'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus',
-        'Right MCgG middle cingulate gyrus','Left MCgG middle cingulate gyrus',
-        'Right MFC medial frontal cortex','Left MFC medial frontal cortex',
-        'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus',
-        'Right MOG middle occipital gyrus','Left MOG middle occipital gyrus',
-        'Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
-        'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
-        'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
-        'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
-        'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus',
-        'Right OCP occipital pole','Left OCP occipital pole',
-        'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
-        'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
-        'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
-        'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus',
-        'Right PCu precuneus','Left PCu precuneus','Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus',
-        'Right PIns posterior insula','Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum',
-        'Right PoG postcentral gyrus','Left PoG postcentral gyrus',
-        'Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
-        'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
-        'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
-        'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus',
-        'Right SMC supplementary motor cortex','Left SMC supplementary motor cortex',
-        'Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
-        'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus',
-        'Right SPL superior parietal lobule','Left SPL superior parietal lobule',
-        'Right STG superior temporal gyrus','Left STG superior temporal gyrus',
-        'Right TMP temporal pole','Left TMP temporal pole',
-        'Right TrIFG triangular part of the inferior frontal gyrus',
-        'Left TrIFG triangular part of the inferior frontal gyrus',
-        'Right TTG transverse temporal gyrus','Left TTG transverse temporal gyrus',
-        'TIV',
-        'Right vessel','Left vessel','Optic Chiasm',
-        'Right Lesion','Left Lesion',
-        'Background and skull','Non-ventricular CSF']
-    ROI_labels_GIF3 = [
-        '3rd Ventricle','4th Ventricle','5th Ventricle',
-        'Right Lateral Ventricle','Left Lateral Ventricle','Right Inf Lat Vent','Left Inf Lat Vent',
-        'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
-        'Pons','Brain Stem','Right Ventral DC','Left Ventral DC','Left Basal Forebrain','Right Basal Forebrain',
-        'Right Caudate','Left Caudate','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
-        'Right Cerebellum Exterior','Left Cerebellum Exterior','Right Cerebellum White Matter','Left Cerebellum White Matter',
-        'Right Cerebral Exterior','Left Cerebral Exterior','3rd Ventricle (Posterior part)',
-        'Right Hippocampus','Left Hippocampus',
-        'Right Pallidum','Left Pallidum',
-        'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
-        'Right Ventricular Lining','Left Ventricular Lining','Optic Chiasm',
-        'Right Temporal White Matter','Right Insula White Matter','Right Cingulate White Matter','Right Frontal White Matter',
-        'Right Occipital White Matter','Right Parietal White Matter',
-        'Corpus Callosum',
-        'Left Temporal White Matter','Left Insula White Matter','Left Cingulate White Matter','Left Frontal White Matter',
-        'Left Occipital White Matter','Left Parietal White Matter',
-        'Right Claustrum','Left Claustrum','Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
-        'Right AIns anterior insula','Left AIns anterior insula','Right AOrG anterior orbital gyrus',
-        'Left AOrG anterior orbital gyrus','Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex',
-        'Left Calc calcarine cortex','Right CO central operculum','Left CO central operculum','Right Cun cuneus','Left Cun cuneus',
-        'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
-        'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
-        'Right GRe gyrus rectus','Left GRe gyrus rectus','Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
-        'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus','Right LiG lingual gyrus','Left LiG lingual gyrus',
-        'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus','Right MCgG middle cingulate gyrus',
-        'Left MCgG middle cingulate gyrus','Right MFC medial frontal cortex','Left MFC medial frontal cortex',
-        'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus','Right MOG middle occipital gyrus',
-        'Left MOG middle occipital gyrus','Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
-        'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
-        'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
-        'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
-        'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus','Right OCP occipital pole','Left OCP occipital pole',
-        'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
-        'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
-        'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
-        'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus','Right PCu precuneus','Left PCu precuneus',
-        'Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus','Right PIns posterior insula',
-        'Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum','Right PoG postcentral gyrus',
-        'Left PoG postcentral gyrus','Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
-        'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
-        'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
-        'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus','Right SMC supplementary motor cortex',
-        'Left SMC supplementary motor cortex','Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
-        'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus','Right SPL superior parietal lobule',
-        'Left SPL superior parietal lobule','Right STG superior temporal gyrus','Left STG superior temporal gyrus',
-        'Right TMP temporal pole','Left TMP temporal pole','Right TrIFG triangular part of the inferior frontal gyrus',
-        'Left TrIFG triangular part of the inferior frontal gyrus','Right TTG transverse temporal gyrus',
-        'Left TTG transverse temporal gyrus',
-        'Right vessel','Left vessel','Right Lesion','Left Lesion',
-        'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
-    ]
+    if include_GIF:
+        df_MRI_ROIvols = pd.read_csv(ppmi_t1_gif3_csv)
+        #****************** END FIX ME *****************
+        print('Taking GIF ROI names from columns 2:end of {0}'.format(ppmi_t1_gif3_csv))
+        ROI_labels = df_MRI_ROIvols.columns[2:]
+        ext = '.nii'
+        # Extract Image IDs from filenames in GIF CSV
+        for k in range(len(df_MRI_ROIvols.filename)):
+            SI = df_MRI_ROIvols.filename[k].strip(ext).split("_")
+            series_id = SI[-2][1:]
+            image_id = SI[-1][1:]
+            df_MRI_ROIvols.at[k,"PATNO"]    = SI[1]
+            df_MRI_ROIvols.at[k,"SeriesID"] = series_id
+            df_MRI_ROIvols.at[k,"ImageID"]  = image_id
+        df_MRI_ROIvols['PATNO'] = df_MRI_ROIvols['PATNO'].apply(lambda x: str(x))
+        df_MRI_ROIvols.ImageID = pd.to_numeric(df_MRI_ROIvols.ImageID,errors='coerce')
+        df_MRI_ROIvols.SeriesID = pd.to_numeric(df_MRI_ROIvols.SeriesID,errors='coerce')
+        df_MRI_ROIvols.rename(columns={'filename':'MRI_filename'},inplace=True)
+        # Optionally Reorder columns
+        reorder = False
+        ROI_labels_GIF2 = [
+            '3rd Ventricle','3rd Ventricle (Posterior part)','4th Ventricle','5th Ventricle',
+            'Right Inf Lat Vent','Left Inf Lat Vent','Right Lateral Ventricle','Left Lateral Ventricle',
+            'Right Ventral DC','Left Ventral DC','Pons','Brain Stem',
+            'Left Basal Forebrain','Right Basal Forebrain',
+            'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
+            'Right Caudate','Left Caudate',
+            'Right Hippocampus','Left Hippocampus',
+            'Right Pallidum','Left Pallidum','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
+            'Right Cun cuneus','Left Cun cuneus',
+            'Right Cerebellum Exterior','Left Cerebellum Exterior',
+            'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
+            'Right Cerebellum White Matter','Left Cerebellum White Matter','Right Cerebral Exterior','Left Cerebral Exterior',
+            'Right Cerebral White Matter','Left Cerebral White Matter',
+            'Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
+            'Right AIns anterior insula','Left AIns anterior insula',
+            'Right AOrG anterior orbital gyrus','Left AOrG anterior orbital gyrus',
+            'Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex','Left Calc calcarine cortex',
+            'Right CO central operculum','Left CO central operculum',
+            'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
+            'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
+            'Right GRe gyrus rectus','Left GRe gyrus rectus',
+            'Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
+            'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus',
+            'Right LiG lingual gyrus','Left LiG lingual gyrus',
+            'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus',
+            'Right MCgG middle cingulate gyrus','Left MCgG middle cingulate gyrus',
+            'Right MFC medial frontal cortex','Left MFC medial frontal cortex',
+            'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus',
+            'Right MOG middle occipital gyrus','Left MOG middle occipital gyrus',
+            'Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
+            'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
+            'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
+            'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
+            'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus',
+            'Right OCP occipital pole','Left OCP occipital pole',
+            'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
+            'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
+            'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
+            'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus',
+            'Right PCu precuneus','Left PCu precuneus','Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus',
+            'Right PIns posterior insula','Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum',
+            'Right PoG postcentral gyrus','Left PoG postcentral gyrus',
+            'Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
+            'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
+            'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
+            'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus',
+            'Right SMC supplementary motor cortex','Left SMC supplementary motor cortex',
+            'Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
+            'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus',
+            'Right SPL superior parietal lobule','Left SPL superior parietal lobule',
+            'Right STG superior temporal gyrus','Left STG superior temporal gyrus',
+            'Right TMP temporal pole','Left TMP temporal pole',
+            'Right TrIFG triangular part of the inferior frontal gyrus',
+            'Left TrIFG triangular part of the inferior frontal gyrus',
+            'Right TTG transverse temporal gyrus','Left TTG transverse temporal gyrus',
+            'TIV',
+            'Right vessel','Left vessel','Optic Chiasm',
+            'Right Lesion','Left Lesion',
+            'Background and skull','Non-ventricular CSF']
+        ROI_labels_GIF3 = [
+            '3rd Ventricle','4th Ventricle','5th Ventricle',
+            'Right Lateral Ventricle','Left Lateral Ventricle','Right Inf Lat Vent','Left Inf Lat Vent',
+            'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
+            'Pons','Brain Stem','Right Ventral DC','Left Ventral DC','Left Basal Forebrain','Right Basal Forebrain',
+            'Right Caudate','Left Caudate','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
+            'Right Cerebellum Exterior','Left Cerebellum Exterior','Right Cerebellum White Matter','Left Cerebellum White Matter',
+            'Right Cerebral Exterior','Left Cerebral Exterior','3rd Ventricle (Posterior part)',
+            'Right Hippocampus','Left Hippocampus',
+            'Right Pallidum','Left Pallidum',
+            'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
+            'Right Ventricular Lining','Left Ventricular Lining','Optic Chiasm',
+            'Right Temporal White Matter','Right Insula White Matter','Right Cingulate White Matter','Right Frontal White Matter',
+            'Right Occipital White Matter','Right Parietal White Matter',
+            'Corpus Callosum',
+            'Left Temporal White Matter','Left Insula White Matter','Left Cingulate White Matter','Left Frontal White Matter',
+            'Left Occipital White Matter','Left Parietal White Matter',
+            'Right Claustrum','Left Claustrum','Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
+            'Right AIns anterior insula','Left AIns anterior insula','Right AOrG anterior orbital gyrus',
+            'Left AOrG anterior orbital gyrus','Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex',
+            'Left Calc calcarine cortex','Right CO central operculum','Left CO central operculum','Right Cun cuneus','Left Cun cuneus',
+            'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
+            'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
+            'Right GRe gyrus rectus','Left GRe gyrus rectus','Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
+            'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus','Right LiG lingual gyrus','Left LiG lingual gyrus',
+            'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus','Right MCgG middle cingulate gyrus',
+            'Left MCgG middle cingulate gyrus','Right MFC medial frontal cortex','Left MFC medial frontal cortex',
+            'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus','Right MOG middle occipital gyrus',
+            'Left MOG middle occipital gyrus','Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
+            'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
+            'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
+            'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
+            'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus','Right OCP occipital pole','Left OCP occipital pole',
+            'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
+            'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
+            'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
+            'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus','Right PCu precuneus','Left PCu precuneus',
+            'Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus','Right PIns posterior insula',
+            'Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum','Right PoG postcentral gyrus',
+            'Left PoG postcentral gyrus','Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
+            'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
+            'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
+            'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus','Right SMC supplementary motor cortex',
+            'Left SMC supplementary motor cortex','Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
+            'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus','Right SPL superior parietal lobule',
+            'Left SPL superior parietal lobule','Right STG superior temporal gyrus','Left STG superior temporal gyrus',
+            'Right TMP temporal pole','Left TMP temporal pole','Right TrIFG triangular part of the inferior frontal gyrus',
+            'Left TrIFG triangular part of the inferior frontal gyrus','Right TTG transverse temporal gyrus',
+            'Left TTG transverse temporal gyrus',
+            'Right vessel','Left vessel','Right Lesion','Left Lesion',
+            'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
+        ]
+        if reorder:
+            df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID'] + ROI_labels_GIF3]
+    
     ROI_labels_FreeSurfer = [
         'eTIV',
         #* ROI volumes
@@ -1573,7 +1608,18 @@ if include_MRI_volumes:
         'rh_rostralanteriorcingulate_area', 'rh_rostralmiddlefrontal_area', 'rh_superiorfrontal_area', 
         'rh_superiorparietal_area', 'rh_superiortemporal_area', 'rh_supramarginal_area', 
         'rh_frontalpole_area', 'rh_temporalpole_area', 'rh_transversetemporal_area', 'rh_insula_area', 
-        'rh_WhiteSurfArea_area'
+        'rh_WhiteSurfArea_area',
+        #* Subcortical, etc.
+        'Left-Lateral-Ventricle','Left-Inf-Lat-Vent','Right-Lateral-Ventricle','Right-Inf-Lat-Vent',
+        'Left-Cerebellum-White-Matter','Left-Cerebellum-Cortex','Left-Thalamus-Proper','Left-Caudate','Left-Putamen','Left-Pallidum','Left-Hippocampus','Left-Amygdala','Left-Accumbens-area','Left-VentralDC','Left-vessel','Left-choroid-plexus',
+        'Right-Cerebellum-White-Matter','Right-Cerebellum-Cortex','Right-Thalamus-Proper','Right-Caudate','Right-Putamen','Right-Pallidum','Right-Hippocampus','Right-Amygdala','Right-Accumbens-area','Right-VentralDC','Right-vessel','Right-choroid-plexus',
+        'Brain-Stem',
+        'CSF','3rd-Ventricle','4th-Ventricle','5th-Ventricle',
+        'WM-hypointensities','Left-WM-hypointensities','Right-WM-hypointensities','non-WM-hypointensities','Left-non-WM-hypointensities','Right-non-WM-hypointensities',
+        'Optic-Chiasm','CC_Posterior','CC_Mid_Posterior','CC_Central','CC_Mid_Anterior','CC_Anterior',
+        'BrainSegVol','BrainSegVolNotVentSurf','lhCortexVol','rhCortexVol','CortexVol',
+        'lhCerebralWhiteMatterVol','rhCerebralWhiteMatterVol','CerebralWhiteMatterVol','SubCortGrayVol','TotalGrayVol',
+        'SupraTentorialVol','SupraTentorialVolNotVent','SupraTentorialVolNotVentVox'
     ]
     # ****** FIX ME ******
     df_freesurfer = pd.read_csv(ppmi_t1_freesurfer_csv,low_memory=False)
@@ -1583,9 +1629,6 @@ if include_MRI_volumes:
         df_freesurfer['ImageID'] = df_freesurfer['ImageID'].map(lambda x: int(x.replace('I','')))
     if df_freesurfer['PATNO'].dtype != str:
         df_freesurfer['PATNO'] = df_freesurfer['PATNO'].map(lambda x: str(x))
-    
-    if reorder:
-        df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID'] + ROI_labels_GIF3]
     
     #* Join MRI_ref (IDA search) with FreeSurfer: get EVENT_ID from IDA search
     # df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer+['filename']].rename(columns={'filename':"MRI_filename"}),
@@ -1599,7 +1642,8 @@ if include_MRI_volumes:
                            how='left'
     )
     #* Join with GIF
-    df_MRI_vols = pd.merge(df_MRI_vols,df_MRI_ROIvols,on=['PATNO','ImageID'],how='left')
+    if include_GIF:
+        df_MRI_vols = pd.merge(df_MRI_vols,df_MRI_ROIvols,on=['PATNO','ImageID'],how='left')
     #* Join PPMIMERGE and MRI_vols
     df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI_vols,on=Keys,how='left',suffixes=('','_MRI'))
     # ****** END FIX ME ******
@@ -1881,7 +1925,7 @@ df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 if PDMEDUSE_validated==0:
     print('{0} table join validated'.format(key))
 else:
-    print('{0} table join failed validation'.format(key))
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(PDMEDUSE_unmatched_rows)
 
 #* Neuro exam
@@ -1900,7 +1944,7 @@ df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 if PENEURO_validated==0:
     print('{0} table join validated'.format(key))
 else:
-    print('{0} table join failed validation'.format(key))
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(PENEURO_unmatched_rows)
 
 #* QUIPCS
@@ -1918,7 +1962,7 @@ df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 if QUIPCS_validated==0:
     print('{0} table join validated'.format(key))
 else:
-    print('{0} table join failed validation'.format(key))
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(QUIPCS_unmatched_rows)
 
 #* SCOPA
@@ -1936,7 +1980,7 @@ df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 if SCOPAAUT_validated==0:
     print('{0} table join validated'.format(key))
 else:
-    print('{0} table join failed validation'.format(key))
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(SCOPAAUT_unmatched_rows)
 
 #* Benton
@@ -1954,7 +1998,7 @@ df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
 if LINEORNT_validated==0:
     print('{0} table join validated'.format(key))
 else:
-    print('{0} table join failed validation'.format(key))
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(LINEORNT_unmatched_rows)
 
 # ## Validate the rest automatically using `tables_of_interest` and `columns_of_interest`
