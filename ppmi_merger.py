@@ -40,20 +40,27 @@ __python_version__ = "3.5.2"
 import os
 #******** FIX ME **********
 data_path = os.path.join('path','to','PPMI','Data')
-data_path = '/Users/noxtoby/Documents/Research/Personal/20200206-POPS_PD_Subtypes/data/PPMI'
-PPMI_csv_path = os.path.join(data_path,'study')
-PPMI_csv_path = os.path.join(PPMI_csv_path,'2020-04-10')
+# data_path = '/Users/noxtoby/Documents/Research/Personal/20200206-POPS_PD_Subtypes/data/PPMI'
+data_path = '/Users/noxtoby/Documents/research-data/PPMI/downloads'
+PPMI_csv_path = os.path.join(data_path,'2021-07-24')
+PPMI_csv_path = os.path.join(PPMI_csv_path,'csv')
 #****** END FIX ME ********
 
 #* Your image collection, e.g., T1-anatomical
-wd = os.path.join(data_path,'imaging')
-ppmi_t1_ida_csv = os.path.join(wd,"PPMI-NonGenetic-T1_bl_4_14_2020.csv")
+wd = data_path #os.path.join(data_path,'imaging')
+# ppmi_t1_ida_csv = os.path.join(wd,"PPMI-NonGenetic-T1_bl_4_14_2020.csv")
+ppmi_t1_ida_csv = os.path.join(wd,"ppmi-t1-dti-20210714_7_14_2021.csv")
 #* Corresponding CSV from the IDA search => gives visit codes
 ppmi_t1_ida_search_csv = ppmi_t1_ida_csv.replace('.csv','_idaSearch.csv') #os.path.join(wd,"PPMI-T1-Orig-3T_5_10_2019_idaSearch.csv")
 
 #* Processed image data
-ppmi_t1_gif3_csv = ppmi_t1_ida_csv.replace('.csv','_gif3.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv")
-ppmi_t1_freesurfer_csv = ppmi_t1_ida_csv.replace('.csv','_freesurfer6p0p0.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_freesurfer6p0p0.csv")
+# ppmi_t1_gif3_csv = ppmi_t1_ida_csv.replace('.csv','_gif3.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_GIF3Vols.csv")
+# ppmi_t1_freesurfer_csv = ppmi_t1_ida_csv.replace('.csv','_freesurfer6p0p0.csv') #os.path.join(data_path,"PPMI-T1-Anatomical_freesurfer6p0p0.csv")
+ppmi_t1_gif3_csv       = '/Users/noxtoby/Documents/research-data/PPMI/processed/ppmi_gif3_volumes_202107.csv'
+ppmi_t1_freesurfer_csv = '/Users/noxtoby/Documents/research-data/PPMI/processed/ppmi_freesurfer7p1p1_aparcstats2table.csv'
+
+ppmi_t1_biomarkers_csv = '/Users/noxtoby/Documents/research-data/PPMI/processed/ppmi_t1_biomarkers.csv'
+include_t1_biomarkers = True
 
 # ## Notes on PPMI
 #   - Page name (PAG_NAME) is table's key in the Data Dictionary (where PAG_NAME is present)
@@ -162,14 +169,14 @@ def unstack_df(df_tall,idCols_Subject_Visit,tallCol_Name_Value):
     else:
         id_is_str = False
     df_tall_pivot = df_tall.copy()
-    df_tall_pivot['ID'] = df_tall_pivot[id_].map(str) + '_' + df_tall_pivot[vis_].map(str)
-    df_tall_pivot = df_tall_pivot.pivot_table(index='ID',columns=tall_name,values=tall_value)
+    df_tall_pivot.loc[:,'ID'] = df_tall_pivot[id_].map(str) + '_' + df_tall_pivot[vis_].map(str)
+    df_tall_pivot = df_tall_pivot.pivot_table(index='ID',columns=tall_name,values=tall_value,aggfunc='first')
     df_tall_pivot = pd.DataFrame(df_tall_pivot.to_records())
     if id_is_str:
-        df_tall_pivot[id_] = df_tall_pivot['ID'].map(lambda x: x.split('_')[0])
+        df_tall_pivot.loc[:,id_] = df_tall_pivot['ID'].map(lambda x: x.split('_')[0])
     else:
-        df_tall_pivot[id_] = df_tall_pivot['ID'].map(lambda x: int(x.split('_')[0]))
-    df_tall_pivot[vis_] = df_tall_pivot['ID'].map(lambda x: x.split('_')[1])
+        df_tall_pivot.loc[:,id_] = df_tall_pivot['ID'].map(lambda x: int(x.split('_')[0]))
+    df_tall_pivot.loc[:,vis_] = df_tall_pivot['ID'].map(lambda x: x.split('_')[1])
     df_tall_pivot.drop('ID',axis=1,inplace=True)
     # Move id and visit to be the first columns
     cols = df_tall_pivot.columns.isin([id_,vis_])
@@ -189,8 +196,8 @@ def df_crossjoin(df1, df2, **kwargs):
     :param kwargs keyword arguments that will be passed to pd.merge()
     :return cross join of df1 and df2
     """
-    df1['_tmpkey'] = 1
-    df2['_tmpkey'] = 1
+    df1.loc[:,'_tmpkey'] = 1
+    df2.loc[:,'_tmpkey'] = 1
 
     res = pd.merge(df1, df2, on='_tmpkey', **kwargs).drop('_tmpkey', axis=1)
     res.index = pd.MultiIndex.from_product((df1.index, df2.index))
@@ -376,17 +383,85 @@ df_BIOLAB = df_BIO_.merge(df_LAB[Keys+['INFODT','PDMEDYN']],how='left',on=Keys,s
 
 #*** 3. Remove earlier Bioanalyses that were reprocessed, and also remove rows: DNA, RNA
 df_BIOLAB = df_BIOLAB.drop(['PI_INSTITUTION','PI_NAME','PROJECTID','update_stamp'],axis=1) # remove some columns for convenience
-df_BIOLAB['TYPE'] = df_BIOLAB['TYPE'].str.replace('Cerebrospinal fluid','CSF') # Recode to CSF
-df_BIOLAB_ = df_BIOLAB[(~df_BIOLAB.TYPE.isin(['DNA','RNA'])) & 
-                       (df_BIOLAB.TESTNAME != 'ApoE Genotype') ].copy() # remove DNA, RNA rows (except APOE genotype)
+df_BIOLAB.loc[:,'TYPE'] = df_BIOLAB['TYPE'].str.replace('Cerebrospinal Fluid','CSF') # Recode to CSF
+
+#* Remove DNA, RNA rows (except APOE genotype)
+remove_DNA_bool = False
+if remove_DNA_bool:
+    df_BIOLAB_ = df_BIOLAB.loc[(~df_BIOLAB.TYPE.isin(['DNA','RNA'])) | (df_BIOLAB.TESTNAME.map(lambda x: x.lower()) == 'apoe genotype') ,'TESTNAME'].unique()
+else:
+    df_BIOLAB_ = df_BIOLAB.copy()
+
+#* Genetics mapper: see Table 1 in PPMI_Methods_PD_Variants_Table.pdf
+rsid = [
+    'rs114138760','rs421016','rs76763715','rs75548401','rs2230288','rs104886460','rs387906315',
+    'rs823118','rs4653767','rs10797576','rs34043159','rs6430538','rs353116','rs1955337','rs4073221',
+    'rs12497850','rs143918452','rs1803274','rs12637471','rs34884217','rs34311866','rs11724635',
+    'rs6812193','rs356181','rs3910105','rs104893877','rs104893875','rs104893878','rs4444903','rs121434567','rs78738012',
+    'rs2694528','rs9468199','rs8192591','rs115462410','rs199347','rs1293298','rs591323','rs2280104','rs13294100',
+    'rs10906923','rs118117788','rs329648','rs76904798','rs33939927','rs33939927','rs33949390','rs35801418',
+    'rs34637584','rs34778348','rs11060180','rs11158026','rs8005172','rs2414739','rs11343','rs14235','rs4784227',
+    'rs11868035','rs17649553','rs12456492','rs55785911','rs737866','rs174674','rs5993883','rs740603','rs165656',
+    'rs6269','rs4633','rs2239393','rs4818','rs4680','rs165599'
+]
+chr = [
+    'chr1','chr1','chr1','chr1','chr1','chr1','chr1',
+    'chr1','chr1','chr1','chr2','chr2','chr2','chr2','chr3',
+    'chr3','chr3','chr3','chr3','chr4','chr4','chr4',
+    'chr4','chr4','chr4','chr4','chr4','chr4','chr4','chr4','chr4',
+    'chr5','chr6','chr6','chr6','chr7','chr8','chr8','chr8','chr9',
+    'chr10','chr10','chr11','chr12','chr12','chr12','chr12','chr12',
+    'chr12','chr12','chr12','chr14','chr14','chr15','chr16','chr16','chr16',
+    'chr17','chr17','chr18','chr20','chr22','chr22','chr22','chr22','chr22',
+    'chr22','chr22','chr22','chr22','chr22','chr22'
+]
+bp_hg38 = [
+    '154925709','155235252','155235843','155236246','155236376','155240629','155240660',
+    '205754444','226728377','232528865','101796654','134782397','165277122','168272635','18235996',
+    '48711556','52782824','165773492','183044649','950422','958159','15735478',
+    '76277833','89704988','89761420','89828149','89828170','89835580','109912954','110004540','113439216',
+    '60978096','27713436','32218019','32698883','23254127','11854934','16839582','22668467','17579692',
+    '15527599','119950976','133895472','40220632','40310434','40310434','40320043','40321114',
+    '40340400','40363526','122819039','54882151','88006268','61701935','19268142','31110472','52565276',
+    '17811787','45917282','43093415','3172857','19942586','19946502','19950115','19957654','19961340',
+    '19962429','19962712','19962905','19963684','19963748','19969258'
+]
+variant_or_gene = [
+    'PMVK','GBA_L444P','GBA_N370S','GBA_T408M','GBA_E365K','GBA_IVS2+1','GBA_84GG',
+    'NUCKS1','ITPKB','SIPA1L2','IL1R2/MAP4K4','ACMSD/TMEM163','SCN3A/SCN2A','STK39','SATB1',
+    'NCKIPSD/CDC71/IP6K2','ITIH1','BuChE','MCCC1','TMEM175','TMEM175','BST1',
+    'FAM47E/STBD1','SNCA','SNCA','SNCA_A53T','SNCA_E46K','SNCA_A30P','EGF','EGF','ANK2/CAMK2D',
+    'ELOVL7/NDUFAF2','ZNF184','NOTCH4_G1739S','HLA_DBQ1','GPNMP','CTSB','MICU3/FGF20','BIN3','SH3GL2',
+    'FAM171A1/ITGA8','MIR4682','MIR4697','LRRK2','LRRK2_R1441G','LRRK2_R1441C','LRRK2_R1628P/H','LRRK2_Y1699C',
+    'LRRK2_G2019S','LRRK2_G2385R','OGFOD2/CCDC62','GCH1','GALC/GPR65','VPS13C','COQ7/SYT17','ZNF646/KAT8/BCKDK','TOX3/CASC16',
+    'SREBF1','MAPT','SYT4/RIT2','DDRGK1','COMT','COMT','COMT','COMT','COMT',
+    'COMT','COMT','COMT','COMT','COMT','COMT'
+]
+simplified_gene = [
+    'PMVK','GBA','GBA','GBA','GBA','GBA','GBA',
+    'NUCKS1','ITPKB','SIPA1L2','IL1R2/MAP4K4','ACMSD/TMEM163','SCN3A/SCN2A','STK39','SATB1',
+    'NCKIPSD/CDC71/IP6K2','ITIH1','BuChE','MCCC1','TMEM175','TMEM175','BST1',
+    'FAM47E/STBD1','SNCA','SNCA','SNCA','SNCA','SNCA','EGF','EGF','ANK2/CAMK2D',
+    'ELOVL7/NDUFAF2','ZNF184','NOTCH4_G1739S','HLA_DBQ1','GPNMP','CTSB','MICU3/FGF20','BIN3','SH3GL2',
+    'FAM171A1/ITGA8','MIR4682','MIR4697','LRRK2','LRRK2','LRRK2','LRRK2','LRRK2',
+    'LRRK2','LRRK2','OGFOD2/CCDC62','GCH1','GALC/GPR65','VPS13C','COQ7/SYT17','ZNF646/KAT8/BCKDK','TOX3/CASC16',
+    'SREBF1','MAPT','SYT4/RIT2','DDRGK1','COMT','COMT','COMT','COMT','COMT',
+    'COMT','COMT','COMT','COMT','COMT','COMT'
+]
+df_PPMI_Methods_PD_Variants_Table = pd.DataFrame({'rsid':rsid,'chr':chr,'bp_hg38':bp_hg38,'Variant Name/Implicated Gene(s)':variant_or_gene,'Simplified Gene':simplified_gene})
+df_PPMI_Methods_PD_Variants_Table.to_csv(os.path.join(data_path,'PPMI_Methods_PD_Variants_Table.csv'))
+ppmi_genetics_mapper = dict(zip(rsid,simplified_gene))
+
 keyColumns = Keys + ['TYPE','TESTNAME']
 dateColumn = 'INFODT' #'RUNDATE'
 
 # df_BIOLAB_2, rowsRemoved, rowsRetained = remove_duplicates( df_BIOLAB_, ID='PATNO', keyColumns=keyColumns, dateColumn=dateColumn)
 df_BIOLAB_sorted = df_BIOLAB_.sort_values(by=keyColumns+[dateColumn],ascending=True)
-df_BIOLAB_unique = df_BIOLAB_sorted.drop_duplicates(subset=keyColumns,keep='last')
+df_BIOLAB_unique = df_BIOLAB_sorted.drop_duplicates(subset=keyColumns,keep='last').copy()
 
-#*** 4. Convert TESTVALUE to numeric (removes 'below detection limit', etc.)
+dna_rna_rowz = (df_BIOLAB_unique.TYPE.isin(['DNA','RNA'])).values
+
+#*** 4. Convert non-comprehensive subset of TESTVALUE to numeric (removes 'below detection limit', etc.)
 TESTVALUE_dict = {
     # CSF Hemoglobin 
     'below detection limit':20, 'below':20, '>20':20, '<20':20, 'above':12500,
@@ -412,23 +487,74 @@ TESTVALUE_dict = {
     #'5907 +/- 39': 5907, '3595+/-50': 3595,'2160 +/- 50': 2160, '3024 +/-10':3024,
     # ApoE Genotype
     'e2/e2':'22', 'e2/e4':'24', 'e3/e2':'32', 'e3/e3':'33', 'e4/e3':'43', 'e4/e4':'44'}
-df_BIOLAB_unique["TESTVALUE"].replace(to_replace=TESTVALUE_dict,inplace=True)
-df_BIOLAB_unique.loc[:,"TESTVALUE"] = df_BIOLAB_unique["TESTVALUE"].astype(str).map(lambda x: x.replace(' ','').split('+/-')[0].replace('<','').replace('>','').replace('insufficientvolume',''))
-df_BIOLAB_unique.loc[:,"TESTVALUE"] = df_BIOLAB_unique["TESTVALUE"].replace('','nan').map(float)
+df_BIOLAB_unique.loc[~dna_rna_rowz,["TESTVALUE"]].replace(to_replace=TESTVALUE_dict,inplace=True)
+#* Convert to float, unless it's DNA/RNA
+numerics = pd.to_numeric(df_BIOLAB_unique["TESTVALUE"],errors='coerce')
+for k in df_BIOLAB_unique.index[~dna_rna_rowz]:
+    df_BIOLAB_unique.at[k,"TESTVALUE"] = numerics.at[k]
+# df_BIOLAB_unique["TESTVALUE"][~dna_rna_rowz].astype(str).map(lambda x: x.replace(' ','').split('+/-')[0].replace('<','').replace('>','').replace('insufficientvolume',''))
 
 #* New visit key for unstacking: EVENT_ID + INFODT + on/off meds
 s = '*'
-df_BIOLAB_unique.loc[:,'key'] = df_BIOLAB_unique['EVENT_ID'].map(str) +s+ df_BIOLAB_unique['INFODT'].map(str) +s+ df_BIOLAB_unique['PDMEDYN'].map(str)
-
+df_BIOLAB_unique['key'] = df_BIOLAB_unique['EVENT_ID'].map(str) +s+ df_BIOLAB_unique['INFODT'].map(str) +s+ df_BIOLAB_unique['PDMEDYN'].map(str)
 #*** 5. Convert long to semi-wide format: pivot on TESTNAME,TESTVALUE
 df_BIOLAB_SemiWide = unstack_df(df_BIOLAB_unique,idCols_Subject_Visit=['PATNO','key'],tallCol_Name_Value=['TESTNAME','TESTVALUE'])
 df_BIOLAB_SemiWide['EVENT_ID'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[0])
 df_BIOLAB_SemiWide['INFODT'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[1])
 df_BIOLAB_SemiWide['PDMEDYN'] = df_BIOLAB_SemiWide['key'].map(lambda x: x.split(s)[2])
+
+#* Combine two APOE columns
+apoe_col = 'APOE GENOTYPE'
+apoe = df_BIOLAB_SemiWide[apoe_col]
+apoe[apoe.isnull()] = df_BIOLAB_SemiWide['ApoE Genotype'][apoe.isnull()].values
+df_BIOLAB_SemiWide.loc[:,apoe_col] = apoe.values
+df_BIOLAB_SemiWide.drop(columns=['ApoE Genotype'],inplace=True)
+
+print('Filling in missing genetic data for:')
+#* Backfill/Forwardfill selected columns (APOE/GBA/MAPT)
+#  From PPMI_Methods_PD_Variants_Table.pdf (see also ppmi_genetics_mapper above)
+# - MAPT: rs17649553
+# - GBA: rs421016, rs76763715, rs75548401, rs2230288, rs104886460, rs387906315
+# - APOE: 
+fillna_selected_biolab_columns = ['rs17649553','rs421016','rs76763715','rs75548401','rs2230288','rs104886460','rs387906315',apoe_col]
+fillna_selected_biolab_columns_gene = ['MAPT','GBA variant','GBA variant','GBA variant','GBA variant','GBA variant','GBA variant','ApoE']
+for c,g in zip(fillna_selected_biolab_columns,fillna_selected_biolab_columns_gene):
+    print('\t %s (%s)' % (c,g))
+# print('Missing values in rs17649553 (prefill): %i' %  df_BIOLAB_SemiWide['rs17649553'].isnull().sum())
+for patno_k in df_BIOLAB_SemiWide.PATNO.unique():
+    rowz = (df_BIOLAB_SemiWide.PATNO == patno_k).values
+    print('.', end='', flush=True)
+    for gene_k in fillna_selected_biolab_columns:
+        colz = df_BIOLAB_SemiWide.columns[df_BIOLAB_SemiWide.columns.str.contains(gene_k)]
+        for col_k in colz:
+            if not df_BIOLAB_SemiWide.loc[rowz,col_k].isnull().all():
+                df_BIOLAB_SemiWide.loc[rowz,[col_k]] = df_BIOLAB_SemiWide.loc[rowz,[col_k]].fillna(method='bfill', axis=0)
+                df_BIOLAB_SemiWide.loc[rowz,[col_k]] = df_BIOLAB_SemiWide.loc[rowz,[col_k]].fillna(method='ffill', axis=0)
+# print('Missing values in rs17649553 (postfill): %i' %  df_BIOLAB_SemiWide['rs17649553'].isnull().sum())
+
+
 df_BIOLAB_SemiWide.drop('key',axis=1,inplace=True)
-cols = df_BIOLAB_SemiWide.columns.isin(['PATNO','EVENT_ID','INFODT','PDMEDYN'])
-df_BIOLAB_SemiWide = df_BIOLAB_SemiWide[df_BIOLAB_SemiWide.columns[cols].append(df_BIOLAB_SemiWide.columns[~cols])]
-df_BIOLAB_SemiWide.to_csv(BIOLAB_csv)
+
+#* Rename selected rsid columns to include gene info
+fillna_selected_biolab_columns_newname = []
+for gene_k,g in zip(fillna_selected_biolab_columns,fillna_selected_biolab_columns_gene):
+    colz = df_BIOLAB_SemiWide.columns[df_BIOLAB_SemiWide.columns.str.contains(gene_k)]
+    for col_k in colz:
+        n = col_k + ' ('+g+')'
+        if col_k==apoe_col:
+            #* Don't rename APOE column
+            fillna_selected_biolab_columns_newname.append(col_k)
+        else:
+            df_BIOLAB_SemiWide.rename(columns = {col_k:n}, inplace = True)
+            fillna_selected_biolab_columns_newname.append(n)
+
+#* Reorder columns
+first_cols = ['PATNO','EVENT_ID','INFODT','PDMEDYN']+fillna_selected_biolab_columns_newname
+cols = df_BIOLAB_SemiWide.columns.isin(first_cols)
+df_BIOLAB_SemiWide = df_BIOLAB_SemiWide[first_cols + df_BIOLAB_SemiWide.columns[~cols].tolist()]
+
+#* Write new BIOLAB to CSV
+df_BIOLAB_SemiWide.to_csv(BIOLAB_csv,index=False)
 
 
 # ### Data Preparation step 3: Prepare tables of interest
@@ -475,8 +601,8 @@ def calculate_scores_MOCA(df_MOCA):
     Calculates MOCA subscores by summing the relevant questions:
     
     MOCA_Visuospatial = MCAALTTM + MCACUBE + MCACLCKC + MCACLCKN + MCACLCKH
-    MCOA_Naming = MCALION + MCARHINO + MCACAMEL
-    MCOA_Attention = MCAFDS + MCABDS + MCAVIGIL + MCASER7
+    MOCA_Naming = MCALION + MCARHINO + MCACAMEL
+    MOCA_Attention = MCAFDS + MCABDS + MCAVIGIL + MCASER7
     MOCA_Language = MCASNTNC + MCAVF
     MOCA_DelayedRecall = MCAREC1 + MCAREC2 + MCAREC3 + MCAREC4 + MCAREC5
     MOCA_Orientation = MCADATE + MCAMONTH + MCAYR + MCADAY + MCAPLACE + MCACITY
@@ -501,6 +627,11 @@ def calculate_scores_MOCA(df_MOCA):
     df_MOCA['MOCA_Letter_Fluency'] = df_MOCA[cols_letter_fluency].values
     
     return ['MOCA_Visuospatial','MOCA_Naming','MOCA_Attention','MOCA_Language','MOCA_DelayedRecall','MOCA_Orientation','MOCA_Letter_Fluency']
+
+#* Could add explicit text for COGSTATE column:
+# 3 - Dementia (PDD)
+# 2 - Mild Cognitive Impairment (PD-MCI)
+# 1 - Normal Cognition (PD-NC)
 
 def calculate_scores_GDSSHORT(df_GDSSHORT):
     """
@@ -821,6 +952,7 @@ tables_of_interest = {
     'PDMEDUSE':'Use_of_PD_Medication',
     #'CONMED':'Concomitant_Medications',
     'CLINDX':'Clinical_Diagnosis_and_Management',
+    'COGCATG':'Cognitive_Categorization',
     'PDFEAT':'PD_Features',
     'VITAL':'Vital_Signs',
     'PECN':'Neurological_Exam___Cranial_Nerves',
@@ -855,17 +987,20 @@ tables_of_interest = {
 valz = list(tables_of_interest.values())
 keyz = list(tables_of_interest.keys())
 columns_of_interest = {
-    'PDMEDUSE':['PDMEDYN','ONLDOPA','ONDOPAG','ONOTHER'],
+    'PDMEDUSE':['PDMEDYN','ONLDOPA','ONDOPAG','ONOTHER'], # 
     #'CONMED':['LEDD'],
     'CLINDX':['INFODT', 'PRIMDIAG', 'DCRTREM', 'DCRIGID', 'DCBRADY'],
+    'COGCATG':['COGDECLN','COGSTATE'],
     'PDFEAT':['PDDXDT','PDDXEST','DXTREMOR','DXRIGID','DXBRADY','DOMSIDE'], 
     'VITAL':['WGTKG', 'HTCM', 'TEMPC', 'SYSSUP', 'DIASUP', 'HRSUP', 'SYSSTND', 'DIASTND', 'HRSTND'],
     'PECN':['CN1RSP','CN2RSP','CN346RSP','CN5RSP','CN7RSP','CN8RSP','CN910RSP','CN11RSP','CN12RSP'],
-    'PENEURO':['MSRARSP','MSRACM','MSLARSP','MSLACM','MSRLRSP','MSRLCM','MSLLRSP','MSLLCM',
-               'COFNRRSP','COFNRCM','COFNLRSP','COFNLCM','COHSRRSP','COHSRCM','COHSLRSP','COHSLCM',
-               'SENRARSP','SENRACM','SENLARSP','SENLACM','SENRLRSP','SENRLCM','SENLLRSP','SENLLCM',
-               'RFLRARSP','RFLRACM','RFLLARSP','RFLLACM','RFLRLRSP','RFLRLCM','RFLLLRSP','RFLLLCM',
-               'PLRRRSP','PLRRCM','PLRLRSP','PLRLCM'],
+    # Updated July 2021
+    # 'PENEURO':['MSRARSP','MSRACM','MSLARSP','MSLACM','MSRLRSP','MSRLCM','MSLLRSP','MSLLCM',
+    #            'COFNRRSP','COFNRCM','COFNLRSP','COFNLCM','COHSRRSP','COHSRCM','COHSLRSP','COHSLCM',
+    #            'SENRARSP','SENRACM','SENLARSP','SENLACM','SENRLRSP','SENRLCM','SENLLRSP','SENLLCM',
+    #            'RFLRARSP','RFLRACM','RFLLARSP','RFLLACM','RFLRLRSP','RFLRLCM','RFLLLRSP','RFLLLCM',
+    #            'PLRRRSP','PLRRCM','PLRLRSP','PLRLCM'],
+    'PENEURO':['MSRARSP','MSLARSP','MSRLRSP','MSLLRSP','COFNRRSP','COFNLRSP','COHSRRSP','COHSLRSP','SENRARSP','SENLARSP','SENRLRSP','SENLLRSP','RFLRARSP','RFLLARSP','RFLRLRSP','RFLLLRSP','PLRRRSP','PLRLRSP'],
     'MOCA':['MCATOT',
             'MCAALTTM','MCACUBE','MCACLCKC','MCACLCKN','MCACLCKH',
             'MCALION','MCARHINO','MCACAMEL',
@@ -921,6 +1056,7 @@ columns_of_interest = {
 
 #*** 3.1 Subscores and total scores: MOCA, GDSSHORT, SCOPAAUT, STAI, QUIPCS, EPWORTH, REMSLEEP, UPSIT, PENEURO, PECN, UPDRS
 df_MOCA = PPMI_df[np.where([1 if n.lower()==tables_of_interest['MOCA'].lower() else 0 for n in PPMI_df_names])[0][0]]
+df_MOCA.sort_values(by=['PATNO',dateColumn]).drop_duplicates(subset=['PATNO','EVENT_ID'],keep='last',inplace=True)
 columns_of_interest['MOCA'].extend(calculate_scores_MOCA(df_MOCA))
 
 df_GDSSHORT = PPMI_df[np.where([1 if n.lower()==tables_of_interest['GDSSHORT'].lower() else 0 for n in PPMI_df_names])[0][0]]
@@ -945,6 +1081,7 @@ df_UPSIT = PPMI_df[np.where([1 if n.lower()==tables_of_interest['UPSIT'].lower()
 columns_of_interest['UPSIT'].extend(calculate_scores_UPSIT(df_UPSIT))
 
 df_PENEURO = PPMI_df[np.where([1 if n.lower()==tables_of_interest['PENEURO'].lower() else 0 for n in PPMI_df_names])[0][0]]
+df_PENEURO.sort_values(by=['PATNO',dateColumn]).drop_duplicates(subset=['PATNO','EVENT_ID'],keep='last',inplace=True)
 columns_of_interest['PENEURO'].extend(calculate_scores_PENEURO(df_PENEURO))
 
 df_PECN = PPMI_df[np.where([1 if n.lower()==tables_of_interest['PECN'].lower() else 0 for n in PPMI_df_names])[0][0]]
@@ -1015,12 +1152,12 @@ df_PDFEAT_tmp = PPMI_df[np.where([1 if n==tables_of_interest['PDFEAT'] else 0 fo
 df_PDFEAT_tmp = df_PDFEAT_tmp[['PATNO']+columns_of_interest['PDFEAT']]
 df_PDFEAT_tmp = df_PDFEAT_tmp.merge(df_subjects[['PATNO','ENROLLDT']],on=['PATNO'],how='left')
 df_PDFEAT_tmp[PDDURAT] = (pd.to_datetime(df_PDFEAT_tmp['ENROLLDT']) - pd.to_datetime(df_PDFEAT_tmp['PDDXDT'])).apply(lambda x: round(x.days/daysInAYear,3))
-df_subjects = df_subjects.merge(df_PDFEAT_tmp[['PATNO',PDDURAT]],on=['PATNO'],how='left')
+df_subjects = df_subjects.merge(df_PDFEAT_tmp[['PATNO',PDDURAT,'DOMSIDE']],on=['PATNO'],how='left')
 
 df_subjects = df_subjects[['PATNO', 'APPRDX_enrol', 'APPRDX_current', PDDURAT, 'GENDER', 'BIRTHDT',
                            'GENECAT', 'MUTRSLT', 'LRRKCD', # genetics info
                            'FAMHXPD_N1stDegree', 'FAMHXPD_N2ndDegree', 
-                           'EDUCYRS','HANDED',
+                           'EDUCYRS','HANDED','DOMSIDE',
                            'HISPLAT', 'RAINDALS', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAWHITE', 'RANOS',
                            'ENROLLDT', 'CONSNTDT'
                           ]]
@@ -1049,7 +1186,10 @@ print('Merging tables of interest')
 key = 'PDMEDUSE'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
+df_.sort_values(by=['PATNO',dateColumn],inplace=True)
+df_.drop_duplicates(subset=['PATNO','INFODT'],keep='last',inplace=True)
+#df_ = df_.drop(index=df_.index[(PPMI_df[n]['PAG_NAME']=='PDMEDUSB').values],inplace=False)
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 #* All EVENT_ID=='LOG' in CONMED, so I need to define calculate_ledd() above
@@ -1065,14 +1205,21 @@ print('.')
 key = 'CLINDX'
 cols = ['PATNO','EVENT_ID'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
+df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
+print('.')
+
+key = 'COGCATG'
+cols = ['PATNO','EVENT_ID'] + columns_of_interest[key]
+n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'VITAL'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
@@ -1082,56 +1229,56 @@ df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_BIOLAB_SemiWide,on=Keys,how='left',suffi
 key = 'MOCA'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'REMSLEEP'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'EPWORTH'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'UPSIT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'SCOPAAUT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'NUPDRS1'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'NUPDRS1p'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'NUPDRS2p'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
@@ -1160,7 +1307,7 @@ columns_of_interest['NUPDRS3'] = [s.replace('PN3','NP3') for s in columns_of_int
 key = 'NUPDRS4'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
@@ -1173,70 +1320,70 @@ print('.')
 key = 'GDSSHORT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'QUIPCS'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'SFT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'LNSPD'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'LINEORNT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'SDM'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'STAI'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'HVLT'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'PECN'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
 key = 'PENEURO'
 cols = ['PATNO','EVENT_ID','INFODT'] + columns_of_interest[key]
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
-df_ = PPMI_df[n][cols]
+df_ = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_,on=Keys,how='left',suffixes=('','_'+key))
 print('.')
 
@@ -1266,9 +1413,9 @@ df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_AVIMAG,on=Keys,how='left',suffixes=('','
 print('.')
 
 key = 'MRI'
-cols = ['PATNO','EVENT_ID','INFODT','MRIDT',
-        'MRICMPLT', 'MRIWDTI', 'MRIWRSS', 'MRIXFRYN', 'MRIRSLT',
-        'PDMEDDT', 'COMM']
+cols = ['PATNO','EVENT_ID','INFODT',
+        'MRICMPLT','MRIDT','MRIWDTI','MRIWRSS','MRIXFRYN','MRIRSLT',
+        'PDMEDYN','ONLDOPA','ONDOPAG','ONOTHER','PDMEDDT']
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_MRI = PPMI_df[n][cols].copy()
 df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI,on=Keys,how='left',suffixes=('','_'+key))
@@ -1379,271 +1526,296 @@ if include_MRI_volumes:
     df_MRI_ref0.rename(index=str, columns={"Image ID": "ImageID", "Subject ID": "PATNO", "Visit": "Visit_desc"},inplace=True)
     df_MRI_ref0.drop(["Imaging Protocol"],axis=1,inplace=True) #df_MRI_ref0.drop(["Imaging Protocol","Modality"],axis=1,inplace=True)
     #* Tidy and merge
-    df_MRI_ref0 = df_MRI_ref0[['PATNO', 'ImageID', 'Visit_desc', 'Study Date', 'Research Group', 'Description' ]]
-    df_MRI_ref1 = df_MRI_ref1[['PATNO', 'ImageID', 'Visit', 'Acq Date' ]]
+    df_MRI_ref0 = df_MRI_ref0[['PATNO', 'ImageID', 'Visit_desc', 'Study Date', 'Research Group', 'Description' ]].copy()
+    df_MRI_ref0['PATNO'] = df_MRI_ref0['PATNO'].astype(str)
+    df_MRI_ref0['ImageID'] = df_MRI_ref0['ImageID'].map(lambda x: str(x).replace('I','')).astype(str)
+    df_MRI_ref1 = df_MRI_ref1[['PATNO', 'ImageID', 'Visit', 'Acq Date' ]].copy()
+    df_MRI_ref1['PATNO'] = df_MRI_ref1['PATNO'].astype(str)
+    df_MRI_ref1['ImageID'] = df_MRI_ref1['ImageID'].map(lambda x: str(x).replace('I','')).astype(str)
     df_MRI_ref = pd.merge(df_MRI_ref0,df_MRI_ref1,on=['PATNO','ImageID'])[['PATNO', 'ImageID', 'Visit', 'Visit_desc', 'Study Date', 'Research Group', 'Description']]
-    df_MRI_ref['PATNO'] = df_MRI_ref['PATNO'].astype(str)
     
     #* Generate EVENT_ID
     df_MRI_ref["EVENT_ID"] = df_MRI_ref.Visit_desc.map({
         'Screening':'SC', 'Baseline':"BL", 
         'Month 12':'V04', 'Month 24':'V06', 'Month 48':'V10',
+        'Month 54':'V11', 'Month 60':'V12', 'Month 72':'V13',
+        'Month 84':'V14', 'Month 96':'V15', 'Month 108':'V16',
+        'Month 120':'V17', 'Month 132':'V18', 'Month 144':'V19',
+        'Month 156':'V20',
         'Symptomatic Therapy':'ST', 'Premature Withdrawal':'PW',
         'Unscheduled Visit 01':'UT01', 'Unscheduled Visit 02':'UT02'})
     
-    #* GIF volumes
-    include_GIF = False
-    #******************** FIX ME *******************
-    if include_GIF:
-        df_MRI_ROIvols = pd.read_csv(ppmi_t1_gif3_csv)
-        #****************** END FIX ME *****************
-        print('Taking GIF ROI names from columns 2:end of {0}'.format(ppmi_t1_gif3_csv))
-        ROI_labels = df_MRI_ROIvols.columns[2:]
-        ext = '.nii'
-        # Extract Image IDs from filenames in GIF CSV
-        for k in range(len(df_MRI_ROIvols.filename)):
-            SI = df_MRI_ROIvols.filename[k].strip(ext).split("_")
-            series_id = SI[-2][1:]
-            image_id = SI[-1][1:]
-            df_MRI_ROIvols.at[k,"PATNO"]    = SI[1]
-            df_MRI_ROIvols.at[k,"SeriesID"] = series_id
-            df_MRI_ROIvols.at[k,"ImageID"]  = image_id
-        df_MRI_ROIvols['PATNO'] = df_MRI_ROIvols['PATNO'].apply(lambda x: str(x))
-        df_MRI_ROIvols.ImageID = pd.to_numeric(df_MRI_ROIvols.ImageID,errors='coerce')
-        df_MRI_ROIvols.SeriesID = pd.to_numeric(df_MRI_ROIvols.SeriesID,errors='coerce')
-        df_MRI_ROIvols.rename(columns={'filename':'MRI_filename'},inplace=True)
-        # Optionally Reorder columns
-        reorder = False
-        ROI_labels_GIF2 = [
-            '3rd Ventricle','3rd Ventricle (Posterior part)','4th Ventricle','5th Ventricle',
-            'Right Inf Lat Vent','Left Inf Lat Vent','Right Lateral Ventricle','Left Lateral Ventricle',
-            'Right Ventral DC','Left Ventral DC','Pons','Brain Stem',
-            'Left Basal Forebrain','Right Basal Forebrain',
-            'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
-            'Right Caudate','Left Caudate',
-            'Right Hippocampus','Left Hippocampus',
-            'Right Pallidum','Left Pallidum','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
-            'Right Cun cuneus','Left Cun cuneus',
-            'Right Cerebellum Exterior','Left Cerebellum Exterior',
-            'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
-            'Right Cerebellum White Matter','Left Cerebellum White Matter','Right Cerebral Exterior','Left Cerebral Exterior',
-            'Right Cerebral White Matter','Left Cerebral White Matter',
-            'Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
-            'Right AIns anterior insula','Left AIns anterior insula',
-            'Right AOrG anterior orbital gyrus','Left AOrG anterior orbital gyrus',
-            'Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex','Left Calc calcarine cortex',
-            'Right CO central operculum','Left CO central operculum',
-            'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
-            'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
-            'Right GRe gyrus rectus','Left GRe gyrus rectus',
-            'Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
-            'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus',
-            'Right LiG lingual gyrus','Left LiG lingual gyrus',
-            'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus',
-            'Right MCgG middle cingulate gyrus','Left MCgG middle cingulate gyrus',
-            'Right MFC medial frontal cortex','Left MFC medial frontal cortex',
-            'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus',
-            'Right MOG middle occipital gyrus','Left MOG middle occipital gyrus',
-            'Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
-            'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
-            'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
-            'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
-            'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus',
-            'Right OCP occipital pole','Left OCP occipital pole',
-            'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
-            'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
-            'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
-            'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus',
-            'Right PCu precuneus','Left PCu precuneus','Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus',
-            'Right PIns posterior insula','Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum',
-            'Right PoG postcentral gyrus','Left PoG postcentral gyrus',
-            'Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
-            'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
-            'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
-            'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus',
-            'Right SMC supplementary motor cortex','Left SMC supplementary motor cortex',
-            'Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
-            'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus',
-            'Right SPL superior parietal lobule','Left SPL superior parietal lobule',
-            'Right STG superior temporal gyrus','Left STG superior temporal gyrus',
-            'Right TMP temporal pole','Left TMP temporal pole',
-            'Right TrIFG triangular part of the inferior frontal gyrus',
-            'Left TrIFG triangular part of the inferior frontal gyrus',
-            'Right TTG transverse temporal gyrus','Left TTG transverse temporal gyrus',
-            'TIV',
-            'Right vessel','Left vessel','Optic Chiasm',
-            'Right Lesion','Left Lesion',
-            'Background and skull','Non-ventricular CSF']
-        ROI_labels_GIF3 = [
-            '3rd Ventricle','4th Ventricle','5th Ventricle',
-            'Right Lateral Ventricle','Left Lateral Ventricle','Right Inf Lat Vent','Left Inf Lat Vent',
-            'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
-            'Pons','Brain Stem','Right Ventral DC','Left Ventral DC','Left Basal Forebrain','Right Basal Forebrain',
-            'Right Caudate','Left Caudate','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
-            'Right Cerebellum Exterior','Left Cerebellum Exterior','Right Cerebellum White Matter','Left Cerebellum White Matter',
-            'Right Cerebral Exterior','Left Cerebral Exterior','3rd Ventricle (Posterior part)',
-            'Right Hippocampus','Left Hippocampus',
-            'Right Pallidum','Left Pallidum',
-            'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
-            'Right Ventricular Lining','Left Ventricular Lining','Optic Chiasm',
-            'Right Temporal White Matter','Right Insula White Matter','Right Cingulate White Matter','Right Frontal White Matter',
-            'Right Occipital White Matter','Right Parietal White Matter',
-            'Corpus Callosum',
-            'Left Temporal White Matter','Left Insula White Matter','Left Cingulate White Matter','Left Frontal White Matter',
-            'Left Occipital White Matter','Left Parietal White Matter',
-            'Right Claustrum','Left Claustrum','Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
-            'Right AIns anterior insula','Left AIns anterior insula','Right AOrG anterior orbital gyrus',
-            'Left AOrG anterior orbital gyrus','Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex',
-            'Left Calc calcarine cortex','Right CO central operculum','Left CO central operculum','Right Cun cuneus','Left Cun cuneus',
-            'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
-            'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
-            'Right GRe gyrus rectus','Left GRe gyrus rectus','Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
-            'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus','Right LiG lingual gyrus','Left LiG lingual gyrus',
-            'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus','Right MCgG middle cingulate gyrus',
-            'Left MCgG middle cingulate gyrus','Right MFC medial frontal cortex','Left MFC medial frontal cortex',
-            'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus','Right MOG middle occipital gyrus',
-            'Left MOG middle occipital gyrus','Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
-            'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
-            'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
-            'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
-            'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus','Right OCP occipital pole','Left OCP occipital pole',
-            'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
-            'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
-            'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
-            'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus','Right PCu precuneus','Left PCu precuneus',
-            'Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus','Right PIns posterior insula',
-            'Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum','Right PoG postcentral gyrus',
-            'Left PoG postcentral gyrus','Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
-            'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
-            'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
-            'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus','Right SMC supplementary motor cortex',
-            'Left SMC supplementary motor cortex','Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
-            'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus','Right SPL superior parietal lobule',
-            'Left SPL superior parietal lobule','Right STG superior temporal gyrus','Left STG superior temporal gyrus',
-            'Right TMP temporal pole','Left TMP temporal pole','Right TrIFG triangular part of the inferior frontal gyrus',
-            'Left TrIFG triangular part of the inferior frontal gyrus','Right TTG transverse temporal gyrus',
-            'Left TTG transverse temporal gyrus',
-            'Right vessel','Left vessel','Right Lesion','Left Lesion',
-            'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
+    if include_t1_biomarkers:
+        df_MRI_biomarkers = pd.read_csv(ppmi_t1_biomarkers_csv)
+        df_MRI_biomarkers['PATNO'] = df_MRI_biomarkers['PATNO'].astype(str)
+        df_MRI_biomarkers['ImageID'] = df_MRI_biomarkers['ImageID'].astype(str)
+        df_MRI_vols = pd.merge(df_MRI_biomarkers,
+                               df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
+                               on=['PATNO','ImageID'],
+                               how='left'
+        )
+    else:
+        #* GIF volumes
+        include_GIF = False
+        #******************** FIX ME *******************
+        if include_GIF:
+            df_MRI_ROIvols = pd.read_csv(ppmi_t1_gif3_csv)
+            #****************** END FIX ME *****************
+            print('Taking GIF ROI names from columns 2:end of {0}'.format(ppmi_t1_gif3_csv))
+            ROI_labels = df_MRI_ROIvols.columns[2:]
+            ext = '.nii'
+            # Extract Image IDs from filenames in GIF CSV
+            for k in range(len(df_MRI_ROIvols.filename)):
+                SI = df_MRI_ROIvols.filename[k].strip(ext).split("_")
+                series_id = SI[-2][1:]
+                image_id = SI[-1][1:]
+                df_MRI_ROIvols.at[k,"PATNO"]    = SI[1]
+                df_MRI_ROIvols.at[k,"SeriesID"] = series_id
+                df_MRI_ROIvols.at[k,"ImageID"]  = image_id
+            df_MRI_ROIvols['PATNO'] = df_MRI_ROIvols['PATNO'].apply(lambda x: str(x))
+            df_MRI_ROIvols.ImageID = pd.to_numeric(df_MRI_ROIvols.ImageID,errors='coerce')
+            df_MRI_ROIvols.SeriesID = pd.to_numeric(df_MRI_ROIvols.SeriesID,errors='coerce')
+            df_MRI_ROIvols.rename(columns={'filename':'MRI_filename'},inplace=True)
+            # Optionally Reorder columns
+            reorder = False
+            ROI_labels_GIF2 = [
+                '3rd Ventricle','3rd Ventricle (Posterior part)','4th Ventricle','5th Ventricle',
+                'Right Inf Lat Vent','Left Inf Lat Vent','Right Lateral Ventricle','Left Lateral Ventricle',
+                'Right Ventral DC','Left Ventral DC','Pons','Brain Stem',
+                'Left Basal Forebrain','Right Basal Forebrain',
+                'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
+                'Right Caudate','Left Caudate',
+                'Right Hippocampus','Left Hippocampus',
+                'Right Pallidum','Left Pallidum','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
+                'Right Cun cuneus','Left Cun cuneus',
+                'Right Cerebellum Exterior','Left Cerebellum Exterior',
+                'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
+                'Right Cerebellum White Matter','Left Cerebellum White Matter','Right Cerebral Exterior','Left Cerebral Exterior',
+                'Right Cerebral White Matter','Left Cerebral White Matter',
+                'Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
+                'Right AIns anterior insula','Left AIns anterior insula',
+                'Right AOrG anterior orbital gyrus','Left AOrG anterior orbital gyrus',
+                'Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex','Left Calc calcarine cortex',
+                'Right CO central operculum','Left CO central operculum',
+                'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
+                'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
+                'Right GRe gyrus rectus','Left GRe gyrus rectus',
+                'Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
+                'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus',
+                'Right LiG lingual gyrus','Left LiG lingual gyrus',
+                'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus',
+                'Right MCgG middle cingulate gyrus','Left MCgG middle cingulate gyrus',
+                'Right MFC medial frontal cortex','Left MFC medial frontal cortex',
+                'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus',
+                'Right MOG middle occipital gyrus','Left MOG middle occipital gyrus',
+                'Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
+                'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
+                'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
+                'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
+                'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus',
+                'Right OCP occipital pole','Left OCP occipital pole',
+                'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
+                'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
+                'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
+                'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus',
+                'Right PCu precuneus','Left PCu precuneus','Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus',
+                'Right PIns posterior insula','Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum',
+                'Right PoG postcentral gyrus','Left PoG postcentral gyrus',
+                'Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
+                'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
+                'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
+                'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus',
+                'Right SMC supplementary motor cortex','Left SMC supplementary motor cortex',
+                'Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
+                'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus',
+                'Right SPL superior parietal lobule','Left SPL superior parietal lobule',
+                'Right STG superior temporal gyrus','Left STG superior temporal gyrus',
+                'Right TMP temporal pole','Left TMP temporal pole',
+                'Right TrIFG triangular part of the inferior frontal gyrus',
+                'Left TrIFG triangular part of the inferior frontal gyrus',
+                'Right TTG transverse temporal gyrus','Left TTG transverse temporal gyrus',
+                'TIV',
+                'Right vessel','Left vessel','Optic Chiasm',
+                'Right Lesion','Left Lesion',
+                'Background and skull','Non-ventricular CSF']
+            ROI_labels_GIF3 = [
+                '3rd Ventricle','4th Ventricle','5th Ventricle',
+                'Right Lateral Ventricle','Left Lateral Ventricle','Right Inf Lat Vent','Left Inf Lat Vent',
+                'Right Accumbens Area','Left Accumbens Area','Right Amygdala','Left Amygdala',
+                'Pons','Brain Stem','Right Ventral DC','Left Ventral DC','Left Basal Forebrain','Right Basal Forebrain',
+                'Right Caudate','Left Caudate','Right Putamen','Left Putamen','Right Thalamus Proper','Left Thalamus Proper',
+                'Right Cerebellum Exterior','Left Cerebellum Exterior','Right Cerebellum White Matter','Left Cerebellum White Matter',
+                'Right Cerebral Exterior','Left Cerebral Exterior','3rd Ventricle (Posterior part)',
+                'Right Hippocampus','Left Hippocampus',
+                'Right Pallidum','Left Pallidum',
+                'Cerebellar Vermal Lobules I-V','Cerebellar Vermal Lobules VI-VII','Cerebellar Vermal Lobules VIII-X',
+                'Right Ventricular Lining','Left Ventricular Lining','Optic Chiasm',
+                'Right Temporal White Matter','Right Insula White Matter','Right Cingulate White Matter','Right Frontal White Matter',
+                'Right Occipital White Matter','Right Parietal White Matter',
+                'Corpus Callosum',
+                'Left Temporal White Matter','Left Insula White Matter','Left Cingulate White Matter','Left Frontal White Matter',
+                'Left Occipital White Matter','Left Parietal White Matter',
+                'Right Claustrum','Left Claustrum','Right ACgG anterior cingulate gyrus','Left ACgG anterior cingulate gyrus',
+                'Right AIns anterior insula','Left AIns anterior insula','Right AOrG anterior orbital gyrus',
+                'Left AOrG anterior orbital gyrus','Right AnG angular gyrus','Left AnG angular gyrus','Right Calc calcarine cortex',
+                'Left Calc calcarine cortex','Right CO central operculum','Left CO central operculum','Right Cun cuneus','Left Cun cuneus',
+                'Right Ent entorhinal area','Left Ent entorhinal area','Right FO frontal operculum','Left FO frontal operculum',
+                'Right FRP frontal pole','Left FRP frontal pole','Right FuG fusiform gyrus','Left FuG fusiform gyrus',
+                'Right GRe gyrus rectus','Left GRe gyrus rectus','Right IOG inferior occipital gyrus','Left IOG inferior occipital gyrus',
+                'Right ITG inferior temporal gyrus','Left ITG inferior temporal gyrus','Right LiG lingual gyrus','Left LiG lingual gyrus',
+                'Right LOrG lateral orbital gyrus','Left LOrG lateral orbital gyrus','Right MCgG middle cingulate gyrus',
+                'Left MCgG middle cingulate gyrus','Right MFC medial frontal cortex','Left MFC medial frontal cortex',
+                'Right MFG middle frontal gyrus','Left MFG middle frontal gyrus','Right MOG middle occipital gyrus',
+                'Left MOG middle occipital gyrus','Right MOrG medial orbital gyrus','Left MOrG medial orbital gyrus',
+                'Right MPoG postcentral gyrus medial segment','Left MPoG postcentral gyrus medial segment',
+                'Right MPrG precentral gyrus medial segment','Left MPrG precentral gyrus medial segment',
+                'Right MSFG superior frontal gyrus medial segment','Left MSFG superior frontal gyrus medial segment',
+                'Right MTG middle temporal gyrus','Left MTG middle temporal gyrus','Right OCP occipital pole','Left OCP occipital pole',
+                'Right OFuG occipital fusiform gyrus','Left OFuG occipital fusiform gyrus',
+                'Right OpIFG opercular part of the inferior frontal gyrus','Left OpIFG opercular part of the inferior frontal gyrus',
+                'Right OrIFG orbital part of the inferior frontal gyrus','Left OrIFG orbital part of the inferior frontal gyrus',
+                'Right PCgG posterior cingulate gyrus','Left PCgG posterior cingulate gyrus','Right PCu precuneus','Left PCu precuneus',
+                'Right PHG parahippocampal gyrus','Left PHG parahippocampal gyrus','Right PIns posterior insula',
+                'Left PIns posterior insula','Right PO parietal operculum','Left PO parietal operculum','Right PoG postcentral gyrus',
+                'Left PoG postcentral gyrus','Right POrG posterior orbital gyrus','Left POrG posterior orbital gyrus',
+                'Right PP planum polare','Left PP planum polare','Right PrG precentral gyrus','Left PrG precentral gyrus',
+                'Right PT planum temporale','Left PT planum temporale','Right SCA subcallosal area','Left SCA subcallosal area',
+                'Right SFG superior frontal gyrus','Left SFG superior frontal gyrus','Right SMC supplementary motor cortex',
+                'Left SMC supplementary motor cortex','Right SMG supramarginal gyrus','Left SMG supramarginal gyrus',
+                'Right SOG superior occipital gyrus','Left SOG superior occipital gyrus','Right SPL superior parietal lobule',
+                'Left SPL superior parietal lobule','Right STG superior temporal gyrus','Left STG superior temporal gyrus',
+                'Right TMP temporal pole','Left TMP temporal pole','Right TrIFG triangular part of the inferior frontal gyrus',
+                'Left TrIFG triangular part of the inferior frontal gyrus','Right TTG transverse temporal gyrus',
+                'Left TTG transverse temporal gyrus',
+                'Right vessel','Left vessel','Right Lesion','Left Lesion',
+                'Non-Brain Outer Tissue','NonBrain Low','NonBrain Mid','NonBrain High','Non-ventricular CSF'
+            ]
+            if reorder:
+                df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID'] + ROI_labels_GIF3]
+    
+        ROI_labels_FreeSurfer = [
+            'eTIV',
+            #* ROI volumes
+            'lh_bankssts_volume', 'lh_caudalanteriorcingulate_volume', 'lh_caudalmiddlefrontal_volume', 
+            'lh_cuneus_volume', 'lh_entorhinal_volume', 'lh_fusiform_volume',
+            'lh_inferiorparietal_volume', 'lh_inferiortemporal_volume', 'lh_isthmuscingulate_volume', 
+            'lh_lateraloccipital_volume', 'lh_lateralorbitofrontal_volume', 'lh_lingual_volume',
+            'lh_medialorbitofrontal_volume', 'lh_middletemporal_volume', 'lh_parahippocampal_volume', 
+            'lh_paracentral_volume', 'lh_parsopercularis_volume', 'lh_parsorbitalis_volume', 
+            'lh_parstriangularis_volume', 'lh_pericalcarine_volume', 'lh_postcentral_volume', 
+            'lh_posteriorcingulate_volume', 'lh_precentral_volume', 'lh_precuneus_volume', 
+            'lh_rostralanteriorcingulate_volume', 'lh_rostralmiddlefrontal_volume', 
+            'lh_superiorfrontal_volume', 'lh_superiorparietal_volume', 'lh_superiortemporal_volume', 
+            'lh_supramarginal_volume', 'lh_frontalpole_volume', 'lh_temporalpole_volume', 
+            'lh_transversetemporal_volume', 'lh_insula_volume', 'rh_bankssts_volume', 
+            'rh_caudalanteriorcingulate_volume', 'rh_caudalmiddlefrontal_volume', 'rh_cuneus_volume', 
+            'rh_entorhinal_volume', 'rh_fusiform_volume', 'rh_inferiorparietal_volume', 
+            'rh_inferiortemporal_volume', 'rh_isthmuscingulate_volume', 'rh_lateraloccipital_volume', 
+            'rh_lateralorbitofrontal_volume', 'rh_lingual_volume', 'rh_medialorbitofrontal_volume', 
+            'rh_middletemporal_volume', 'rh_parahippocampal_volume', 'rh_paracentral_volume', 
+            'rh_parsopercularis_volume', 'rh_parsorbitalis_volume', 'rh_parstriangularis_volume', 
+            'rh_pericalcarine_volume', 'rh_postcentral_volume', 'rh_posteriorcingulate_volume', 
+            'rh_precentral_volume', 'rh_precuneus_volume', 'rh_rostralanteriorcingulate_volume', 
+            'rh_rostralmiddlefrontal_volume', 'rh_superiorfrontal_volume', 'rh_superiorparietal_volume', 
+            'rh_superiortemporal_volume', 'rh_supramarginal_volume', 'rh_frontalpole_volume', 
+            'rh_temporalpole_volume', 'rh_transversetemporal_volume', 'rh_insula_volume', 
+            #* Cortical thicknesses
+            'lh_bankssts_thickness', 'lh_caudalanteriorcingulate_thickness', 
+            'lh_caudalmiddlefrontal_thickness', 'lh_cuneus_thickness', 
+            'lh_entorhinal_thickness', 'lh_fusiform_thickness', 
+            'lh_inferiorparietal_thickness', 'lh_inferiortemporal_thickness', 
+            'lh_isthmuscingulate_thickness', 'lh_lateraloccipital_thickness', 
+            'lh_lateralorbitofrontal_thickness', 'lh_lingual_thickness', 
+            'lh_medialorbitofrontal_thickness', 'lh_middletemporal_thickness', 
+            'lh_parahippocampal_thickness', 'lh_paracentral_thickness', 
+            'lh_parsopercularis_thickness', 'lh_parsorbitalis_thickness', 
+            'lh_parstriangularis_thickness', 'lh_pericalcarine_thickness', 
+            'lh_postcentral_thickness', 'lh_posteriorcingulate_thickness', 
+            'lh_precentral_thickness', 'lh_precuneus_thickness', 'lh_rostralanteriorcingulate_thickness', 
+            'lh_rostralmiddlefrontal_thickness', 'lh_superiorfrontal_thickness', 
+            'lh_superiorparietal_thickness', 'lh_superiortemporal_thickness', 
+            'lh_supramarginal_thickness', 'lh_frontalpole_thickness', 'lh_temporalpole_thickness', 
+            'lh_transversetemporal_thickness', 'lh_insula_thickness', 'lh_MeanThickness_thickness', 
+            'rh_bankssts_thickness', 'rh_caudalanteriorcingulate_thickness', 
+            'rh_caudalmiddlefrontal_thickness', 'rh_cuneus_thickness', 'rh_entorhinal_thickness', 
+            'rh_fusiform_thickness', 'rh_inferiorparietal_thickness', 'rh_inferiortemporal_thickness', 
+            'rh_isthmuscingulate_thickness', 'rh_lateraloccipital_thickness', 
+            'rh_lateralorbitofrontal_thickness', 'rh_lingual_thickness', 'rh_medialorbitofrontal_thickness', 
+            'rh_middletemporal_thickness', 'rh_parahippocampal_thickness', 'rh_paracentral_thickness', 
+            'rh_parsopercularis_thickness', 'rh_parsorbitalis_thickness', 'rh_parstriangularis_thickness', 
+            'rh_pericalcarine_thickness', 'rh_postcentral_thickness', 'rh_posteriorcingulate_thickness', 
+            'rh_precentral_thickness', 'rh_precuneus_thickness', 'rh_rostralanteriorcingulate_thickness', 
+            'rh_rostralmiddlefrontal_thickness', 'rh_superiorfrontal_thickness', 
+            'rh_superiorparietal_thickness', 'rh_superiortemporal_thickness', 'rh_supramarginal_thickness', 
+            'rh_frontalpole_thickness', 'rh_temporalpole_thickness', 'rh_transversetemporal_thickness', 
+            'rh_insula_thickness', 'rh_MeanThickness_thickness', 
+            #* ROI surface area
+            'lh_bankssts_area', 'lh_caudalanteriorcingulate_area', 'lh_caudalmiddlefrontal_area', 
+            'lh_cuneus_area', 'lh_entorhinal_area', 'lh_fusiform_area', 'lh_inferiorparietal_area', 
+            'lh_inferiortemporal_area', 'lh_isthmuscingulate_area', 'lh_lateraloccipital_area', 
+            'lh_lateralorbitofrontal_area', 'lh_lingual_area', 'lh_medialorbitofrontal_area', 
+            'lh_middletemporal_area', 'lh_parahippocampal_area', 'lh_paracentral_area', 
+            'lh_parsopercularis_area', 'lh_parsorbitalis_area', 'lh_parstriangularis_area', 
+            'lh_pericalcarine_area', 'lh_postcentral_area', 'lh_posteriorcingulate_area', 
+            'lh_precentral_area', 'lh_precuneus_area', 'lh_rostralanteriorcingulate_area', 
+            'lh_rostralmiddlefrontal_area', 'lh_superiorfrontal_area', 'lh_superiorparietal_area', 
+            'lh_superiortemporal_area', 'lh_supramarginal_area', 'lh_frontalpole_area', 
+            'lh_temporalpole_area', 'lh_transversetemporal_area', 'lh_insula_area', 
+            'lh_WhiteSurfArea_area', 'rh_bankssts_area', 'rh_caudalanteriorcingulate_area', 
+            'rh_caudalmiddlefrontal_area', 'rh_cuneus_area', 'rh_entorhinal_area', 'rh_fusiform_area', 
+            'rh_inferiorparietal_area', 'rh_inferiortemporal_area', 'rh_isthmuscingulate_area', 
+            'rh_lateraloccipital_area', 'rh_lateralorbitofrontal_area', 'rh_lingual_area', 
+            'rh_medialorbitofrontal_area', 'rh_middletemporal_area', 'rh_parahippocampal_area', 
+            'rh_paracentral_area', 'rh_parsopercularis_area', 'rh_parsorbitalis_area', 
+            'rh_parstriangularis_area', 'rh_pericalcarine_area', 'rh_postcentral_area', 
+            'rh_posteriorcingulate_area', 'rh_precentral_area', 'rh_precuneus_area', 
+            'rh_rostralanteriorcingulate_area', 'rh_rostralmiddlefrontal_area', 'rh_superiorfrontal_area', 
+            'rh_superiorparietal_area', 'rh_superiortemporal_area', 'rh_supramarginal_area', 
+            'rh_frontalpole_area', 'rh_temporalpole_area', 'rh_transversetemporal_area', 'rh_insula_area', 
+            'rh_WhiteSurfArea_area',
+            #* Subcortical, etc.
+            'Left-Lateral-Ventricle','Left-Inf-Lat-Vent','Right-Lateral-Ventricle','Right-Inf-Lat-Vent',
+            'Left-Cerebellum-White-Matter','Left-Cerebellum-Cortex','Left-Thalamus-Proper','Left-Caudate','Left-Putamen','Left-Pallidum','Left-Hippocampus','Left-Amygdala','Left-Accumbens-area','Left-VentralDC','Left-vessel','Left-choroid-plexus',
+            'Right-Cerebellum-White-Matter','Right-Cerebellum-Cortex','Right-Thalamus-Proper','Right-Caudate','Right-Putamen','Right-Pallidum','Right-Hippocampus','Right-Amygdala','Right-Accumbens-area','Right-VentralDC','Right-vessel','Right-choroid-plexus',
+            'Brain-Stem',
+            'CSF','3rd-Ventricle','4th-Ventricle','5th-Ventricle',
+            'WM-hypointensities','Left-WM-hypointensities','Right-WM-hypointensities','non-WM-hypointensities','Left-non-WM-hypointensities','Right-non-WM-hypointensities',
+            'Optic-Chiasm','CC_Posterior','CC_Mid_Posterior','CC_Central','CC_Mid_Anterior','CC_Anterior',
+            'BrainSegVol','BrainSegVolNotVentSurf','lhCortexVol','rhCortexVol','CortexVol',
+            'lhCerebralWhiteMatterVol','rhCerebralWhiteMatterVol','CerebralWhiteMatterVol','SubCortGrayVol','TotalGrayVol',
+            'SupraTentorialVol','SupraTentorialVolNotVent','SupraTentorialVolNotVentVox'
         ]
-        if reorder:
-            df_MRI_ROIvols = df_MRI_ROIvols[['PATNO','ImageID','SeriesID'] + ROI_labels_GIF3]
+        # ****** FIX ME ******
+        df_freesurfer = pd.read_csv(ppmi_t1_freesurfer_csv,low_memory=False)
+        ROI_labels_FreeSurfer = df_freesurfer.columns.tolist()
+        not_ROIs = ['PATNO','subject','session','filename']
+        ROI_labels_FreeSurfer = [r for r in ROI_labels_FreeSurfer if ~(r in not_ROIs)]
+        if 'SeriesID' in df_freesurfer.columns.tolist():
+            if df_freesurfer['SeriesID'].dtype == str:
+                df_freesurfer['SeriesID'] = df_freesurfer['SeriesID'].map(lambda x: int(x.replace('S','')))
+        if 'ImageID' in df_freesurfer.columns.tolist():
+            pass
+        else:
+            df_freesurfer['ImageID'] = df_freesurfer['Image Data ID'].map(lambda x: str(x).replace('I',''))
+        if df_freesurfer['ImageID'].dtype == str:
+            df_freesurfer['ImageID'] = df_freesurfer['ImageID'].map(lambda x: int(x.replace('I','')))
+        if df_freesurfer['PATNO'].dtype != str:
+            df_freesurfer['PATNO'] = df_freesurfer['PATNO'].map(lambda x: str(x))
     
-    ROI_labels_FreeSurfer = [
-        'eTIV',
-        #* ROI volumes
-        'lh_bankssts_volume', 'lh_caudalanteriorcingulate_volume', 'lh_caudalmiddlefrontal_volume', 
-        'lh_cuneus_volume', 'lh_entorhinal_volume', 'lh_fusiform_volume',
-        'lh_inferiorparietal_volume', 'lh_inferiortemporal_volume', 'lh_isthmuscingulate_volume', 
-        'lh_lateraloccipital_volume', 'lh_lateralorbitofrontal_volume', 'lh_lingual_volume',
-        'lh_medialorbitofrontal_volume', 'lh_middletemporal_volume', 'lh_parahippocampal_volume', 
-        'lh_paracentral_volume', 'lh_parsopercularis_volume', 'lh_parsorbitalis_volume', 
-        'lh_parstriangularis_volume', 'lh_pericalcarine_volume', 'lh_postcentral_volume', 
-        'lh_posteriorcingulate_volume', 'lh_precentral_volume', 'lh_precuneus_volume', 
-        'lh_rostralanteriorcingulate_volume', 'lh_rostralmiddlefrontal_volume', 
-        'lh_superiorfrontal_volume', 'lh_superiorparietal_volume', 'lh_superiortemporal_volume', 
-        'lh_supramarginal_volume', 'lh_frontalpole_volume', 'lh_temporalpole_volume', 
-        'lh_transversetemporal_volume', 'lh_insula_volume', 'rh_bankssts_volume', 
-        'rh_caudalanteriorcingulate_volume', 'rh_caudalmiddlefrontal_volume', 'rh_cuneus_volume', 
-        'rh_entorhinal_volume', 'rh_fusiform_volume', 'rh_inferiorparietal_volume', 
-        'rh_inferiortemporal_volume', 'rh_isthmuscingulate_volume', 'rh_lateraloccipital_volume', 
-        'rh_lateralorbitofrontal_volume', 'rh_lingual_volume', 'rh_medialorbitofrontal_volume', 
-        'rh_middletemporal_volume', 'rh_parahippocampal_volume', 'rh_paracentral_volume', 
-        'rh_parsopercularis_volume', 'rh_parsorbitalis_volume', 'rh_parstriangularis_volume', 
-        'rh_pericalcarine_volume', 'rh_postcentral_volume', 'rh_posteriorcingulate_volume', 
-        'rh_precentral_volume', 'rh_precuneus_volume', 'rh_rostralanteriorcingulate_volume', 
-        'rh_rostralmiddlefrontal_volume', 'rh_superiorfrontal_volume', 'rh_superiorparietal_volume', 
-        'rh_superiortemporal_volume', 'rh_supramarginal_volume', 'rh_frontalpole_volume', 
-        'rh_temporalpole_volume', 'rh_transversetemporal_volume', 'rh_insula_volume', 
-        #* Cortical thicknesses
-        'lh_bankssts_thickness', 'lh_caudalanteriorcingulate_thickness', 
-        'lh_caudalmiddlefrontal_thickness', 'lh_cuneus_thickness', 
-        'lh_entorhinal_thickness', 'lh_fusiform_thickness', 
-        'lh_inferiorparietal_thickness', 'lh_inferiortemporal_thickness', 
-        'lh_isthmuscingulate_thickness', 'lh_lateraloccipital_thickness', 
-        'lh_lateralorbitofrontal_thickness', 'lh_lingual_thickness', 
-        'lh_medialorbitofrontal_thickness', 'lh_middletemporal_thickness', 
-        'lh_parahippocampal_thickness', 'lh_paracentral_thickness', 
-        'lh_parsopercularis_thickness', 'lh_parsorbitalis_thickness', 
-        'lh_parstriangularis_thickness', 'lh_pericalcarine_thickness', 
-        'lh_postcentral_thickness', 'lh_posteriorcingulate_thickness', 
-        'lh_precentral_thickness', 'lh_precuneus_thickness', 'lh_rostralanteriorcingulate_thickness', 
-        'lh_rostralmiddlefrontal_thickness', 'lh_superiorfrontal_thickness', 
-        'lh_superiorparietal_thickness', 'lh_superiortemporal_thickness', 
-        'lh_supramarginal_thickness', 'lh_frontalpole_thickness', 'lh_temporalpole_thickness', 
-        'lh_transversetemporal_thickness', 'lh_insula_thickness', 'lh_MeanThickness_thickness', 
-        'rh_bankssts_thickness', 'rh_caudalanteriorcingulate_thickness', 
-        'rh_caudalmiddlefrontal_thickness', 'rh_cuneus_thickness', 'rh_entorhinal_thickness', 
-        'rh_fusiform_thickness', 'rh_inferiorparietal_thickness', 'rh_inferiortemporal_thickness', 
-        'rh_isthmuscingulate_thickness', 'rh_lateraloccipital_thickness', 
-        'rh_lateralorbitofrontal_thickness', 'rh_lingual_thickness', 'rh_medialorbitofrontal_thickness', 
-        'rh_middletemporal_thickness', 'rh_parahippocampal_thickness', 'rh_paracentral_thickness', 
-        'rh_parsopercularis_thickness', 'rh_parsorbitalis_thickness', 'rh_parstriangularis_thickness', 
-        'rh_pericalcarine_thickness', 'rh_postcentral_thickness', 'rh_posteriorcingulate_thickness', 
-        'rh_precentral_thickness', 'rh_precuneus_thickness', 'rh_rostralanteriorcingulate_thickness', 
-        'rh_rostralmiddlefrontal_thickness', 'rh_superiorfrontal_thickness', 
-        'rh_superiorparietal_thickness', 'rh_superiortemporal_thickness', 'rh_supramarginal_thickness', 
-        'rh_frontalpole_thickness', 'rh_temporalpole_thickness', 'rh_transversetemporal_thickness', 
-        'rh_insula_thickness', 'rh_MeanThickness_thickness', 
-        #* ROI surface area
-        'lh_bankssts_area', 'lh_caudalanteriorcingulate_area', 'lh_caudalmiddlefrontal_area', 
-        'lh_cuneus_area', 'lh_entorhinal_area', 'lh_fusiform_area', 'lh_inferiorparietal_area', 
-        'lh_inferiortemporal_area', 'lh_isthmuscingulate_area', 'lh_lateraloccipital_area', 
-        'lh_lateralorbitofrontal_area', 'lh_lingual_area', 'lh_medialorbitofrontal_area', 
-        'lh_middletemporal_area', 'lh_parahippocampal_area', 'lh_paracentral_area', 
-        'lh_parsopercularis_area', 'lh_parsorbitalis_area', 'lh_parstriangularis_area', 
-        'lh_pericalcarine_area', 'lh_postcentral_area', 'lh_posteriorcingulate_area', 
-        'lh_precentral_area', 'lh_precuneus_area', 'lh_rostralanteriorcingulate_area', 
-        'lh_rostralmiddlefrontal_area', 'lh_superiorfrontal_area', 'lh_superiorparietal_area', 
-        'lh_superiortemporal_area', 'lh_supramarginal_area', 'lh_frontalpole_area', 
-        'lh_temporalpole_area', 'lh_transversetemporal_area', 'lh_insula_area', 
-        'lh_WhiteSurfArea_area', 'rh_bankssts_area', 'rh_caudalanteriorcingulate_area', 
-        'rh_caudalmiddlefrontal_area', 'rh_cuneus_area', 'rh_entorhinal_area', 'rh_fusiform_area', 
-        'rh_inferiorparietal_area', 'rh_inferiortemporal_area', 'rh_isthmuscingulate_area', 
-        'rh_lateraloccipital_area', 'rh_lateralorbitofrontal_area', 'rh_lingual_area', 
-        'rh_medialorbitofrontal_area', 'rh_middletemporal_area', 'rh_parahippocampal_area', 
-        'rh_paracentral_area', 'rh_parsopercularis_area', 'rh_parsorbitalis_area', 
-        'rh_parstriangularis_area', 'rh_pericalcarine_area', 'rh_postcentral_area', 
-        'rh_posteriorcingulate_area', 'rh_precentral_area', 'rh_precuneus_area', 
-        'rh_rostralanteriorcingulate_area', 'rh_rostralmiddlefrontal_area', 'rh_superiorfrontal_area', 
-        'rh_superiorparietal_area', 'rh_superiortemporal_area', 'rh_supramarginal_area', 
-        'rh_frontalpole_area', 'rh_temporalpole_area', 'rh_transversetemporal_area', 'rh_insula_area', 
-        'rh_WhiteSurfArea_area',
-        #* Subcortical, etc.
-        'Left-Lateral-Ventricle','Left-Inf-Lat-Vent','Right-Lateral-Ventricle','Right-Inf-Lat-Vent',
-        'Left-Cerebellum-White-Matter','Left-Cerebellum-Cortex','Left-Thalamus-Proper','Left-Caudate','Left-Putamen','Left-Pallidum','Left-Hippocampus','Left-Amygdala','Left-Accumbens-area','Left-VentralDC','Left-vessel','Left-choroid-plexus',
-        'Right-Cerebellum-White-Matter','Right-Cerebellum-Cortex','Right-Thalamus-Proper','Right-Caudate','Right-Putamen','Right-Pallidum','Right-Hippocampus','Right-Amygdala','Right-Accumbens-area','Right-VentralDC','Right-vessel','Right-choroid-plexus',
-        'Brain-Stem',
-        'CSF','3rd-Ventricle','4th-Ventricle','5th-Ventricle',
-        'WM-hypointensities','Left-WM-hypointensities','Right-WM-hypointensities','non-WM-hypointensities','Left-non-WM-hypointensities','Right-non-WM-hypointensities',
-        'Optic-Chiasm','CC_Posterior','CC_Mid_Posterior','CC_Central','CC_Mid_Anterior','CC_Anterior',
-        'BrainSegVol','BrainSegVolNotVentSurf','lhCortexVol','rhCortexVol','CortexVol',
-        'lhCerebralWhiteMatterVol','rhCerebralWhiteMatterVol','CerebralWhiteMatterVol','SubCortGrayVol','TotalGrayVol',
-        'SupraTentorialVol','SupraTentorialVolNotVent','SupraTentorialVolNotVentVox'
-    ]
-    # ****** FIX ME ******
-    df_freesurfer = pd.read_csv(ppmi_t1_freesurfer_csv,low_memory=False)
-    if df_freesurfer['SeriesID'].dtype == str:
-        df_freesurfer['SeriesID'] = df_freesurfer['SeriesID'].map(lambda x: int(x.replace('S','')))
-    if df_freesurfer['ImageID'].dtype == str:
-        df_freesurfer['ImageID'] = df_freesurfer['ImageID'].map(lambda x: int(x.replace('I','')))
-    if df_freesurfer['PATNO'].dtype != str:
-        df_freesurfer['PATNO'] = df_freesurfer['PATNO'].map(lambda x: str(x))
-    
-    #* Join MRI_ref (IDA search) with FreeSurfer: get EVENT_ID from IDA search
-    # df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer+['filename']].rename(columns={'filename':"MRI_filename"}),
-    #                        df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
-    #                        on=['PATNO','ImageID'],
-    #                        how='left'
-    # )
-    df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer],
-                           df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
-                           on=['PATNO','ImageID'],
-                           how='left'
-    )
-    #* Join with GIF
-    if include_GIF:
-        df_MRI_vols = pd.merge(df_MRI_vols,df_MRI_ROIvols,on=['PATNO','ImageID'],how='left')
+        #* Join MRI_ref (IDA search) with FreeSurfer: get EVENT_ID from IDA search
+        # df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer+['filename']].rename(columns={'filename':"MRI_filename"}),
+        #                        df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
+        #                        on=['PATNO','ImageID'],
+        #                        how='left'
+        # )
+        df_MRI_vols = pd.merge(df_freesurfer[['PATNO','ImageID']+ROI_labels_FreeSurfer],
+                               df_MRI_ref[['EVENT_ID','PATNO','ImageID']],
+                               on=['PATNO','ImageID'],
+                               how='left'
+        )
+        #* Join with GIF
+        if include_GIF:
+            df_MRI_vols = pd.merge(df_MRI_vols,df_MRI_ROIvols,on=['PATNO','ImageID'],how='left')
     #* Join PPMIMERGE and MRI_vols
     df_PPMIMERGE = pd.merge(df_PPMIMERGE,df_MRI_vols,on=Keys,how='left',suffixes=('','_MRI'))
     # ****** END FIX ME ******
@@ -1701,16 +1873,17 @@ df_PPMIMERGE['TD_PIGD_class'] = TD_PIGD_class
 
 #*** This could be the ranking order
 INFODT_cols = ['INFODT',
+               'INFODT_NUPDRS1','INFODT_NUPDRS1p',
                'INFODT_CLINDX','INFODT_VITAL','INFODT_BIOANALYS','INFODT_MOCA','INFODT_REMSLEEP',
-               'INFODT_EPWORTH','INFODT_UPSIT',
-               'INFODT_NUPDRS1','INFODT_NUPDRS2p','INFODT_NUPDRS3','INFODT_NUPDRS3A','INFODT_NUPDRS4',
+               'INFODT_EPWORTH','INFODT_UPSIT','INFODT_SCOPAAUT',
+               'INFODT_NUPDRS2p','INFODT_NUPDRS3','INFODT_NUPDRS3A','INFODT_NUPDRS4',
                'INFODT_GDSSHORT','INFODT_QUIPCS','INFODT_SFT','INFODT_LNSPD','INFODT_LINEORNT','INFODT_SDM',
                'INFODT_STAI','INFODT_HVLT','INFODT_PECN','INFODT_PENEURO','INFODT_DATSCAN','INFODT_AVIMAG',
                'INFODT_MRI']
 
-def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
+def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_',INFODT_fallback='INFODT_NUPDRS1'):
     """
-    My ad hoc policy here was to use the earliest (oldest) available date.
+    My original ad hoc policy here was to use the earliest (oldest) available date.
     I decided this after hand-checking a few entries that had more than one 
     unique INFODT across tables to discover that more tests/exams were performed 
     at the earliest available date.
@@ -1719,6 +1892,14 @@ def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
     
     A better way to do this might be to explicitly search for missing INFODTs 
     before merging tables, and even using different INFODTs for different biomarkers.
+    
+    Update: now has an option for 'consensus' or 'precedence'.
+    - 'consensus' takes the mode across all INFODTs 
+    - 'precedence' uses the first non-missing INFODT from the ordered list provided 
+      as input variable INFODT_cols
+    
+    Subsequent missing INFODTs are replaced using input variable INFODT_fallback, which defaults to NUPDRS1
+    
     """
     approaches = ['consensus','precedence']
     approach = approaches[0]
@@ -1740,7 +1921,6 @@ def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
         #    if len(v)>1:
         #        print('index = {0}\n  {1}'.format(k,v))
         df[INFODT_new] = mode_
-        
     elif approach == 'precedence':
         for c in INFODT_cols:
             if ~df[c].isnull():
@@ -1749,6 +1929,9 @@ def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
     else :
         print('ERROR in fill_missing_INFODT(): unknown approach.')
     
+    #* Replace missing with NUPDRS1
+    infodt_is_missing = df[INFODT_new].isnull()
+    df.loc[infodt_is_missing,INFODT_new] = df.loc[infodt_is_missing,INFODT_fallback].map(pd.to_datetime)
     # #* SLOW VERSION: Loop through each row.
     # for k in range(0,df.shape[0]):
     #     #* Extract and Sort dates (increasing, NaN at end)
@@ -1760,7 +1943,7 @@ def fill_missing_INFODT(df_in, INFODT_cols, INFODT_new = 'INFODT_'):
     return df
 
 print('Filling in missing INFODTs')
-df_PPMIMERGE = fill_missing_INFODT(df_PPMIMERGE,INFODT_cols)
+df_PPMIMERGE = fill_missing_INFODT(df_in=df_PPMIMERGE,INFODT_cols=INFODT_cols,INFODT_fallback='INFODT_NUPDRS1')
 
 # # Validate PPMIMERGE
 # Find difference between biomarker values in original table and in PPMIMERGE
@@ -1813,7 +1996,8 @@ cols = ['DTI_FA_ROI1', 'DTI_FA_ROI2', 'DTI_FA_ROI3', 'DTI_FA_ROI4', 'DTI_FA_ROI5
         'DTI_E2_ROI1', 'DTI_E2_ROI2', 'DTI_E2_ROI3', 'DTI_E2_ROI4', 'DTI_E2_ROI5', 'DTI_E2_ROI6', 'DTI_E2_REF1', 'DTI_E2_REF2', 
         'DTI_E3_ROI1', 'DTI_E3_ROI2', 'DTI_E3_ROI3', 'DTI_E3_ROI4', 'DTI_E3_ROI5', 'DTI_E3_ROI6', 'DTI_E3_REF1', 'DTI_E3_REF2']
 c = keys + cols
-df = df_DTIROI_unstacked.loc[df_DTIROI_unstacked.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_DTIROI_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_DTIROI_.EVENT_ID.isin(EVENT_IDs)
+df = df_DTIROI_.loc[rowz.values,c].copy()
 (DTIROI_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if DTIROI_validated==0:
     print('DTI table join validated')
@@ -1822,7 +2006,8 @@ else:
 #* AV Imaging
 cols = ['RCAUD-S', 'RPUTANT-S', 'RPUTPOST-S', 'LCAUD-S', 'LPUTANT-S', 'LPUTPOST-S']
 c = Keys + cols
-df = df_AVIMAG.loc[df_AVIMAG.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_AVIMAG.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_AVIMAG.EVENT_ID.isin(EVENT_IDs)
+df = df_AVIMAG.loc[rowz.values,c].copy()
 (AVIMAG_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if AVIMAG_validated==0:
     print('AV Imaging table join validated')
@@ -1843,7 +2028,8 @@ cols = ['CSF Alpha-synuclein', 'ABeta 1-42', 'pTau', 'tTau',
         'PD2 Peptoid', 'PD2 peptoid', 'Serum IGF-1', 'Total Cholesterol',
         'Triglycerides', 'Apolipoprotein A1']
 c = Keys + cols
-df = df_BIOLAB_SemiWide.loc[df_BIOLAB_SemiWide.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_BIOLAB_SemiWide.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_BIOLAB_SemiWide.EVENT_ID.isin(EVENT_IDs)
+df = df_BIOLAB_SemiWide.loc[rowz.values,c].copy()
 (BIOLAB_SemiWide_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if BIOLAB_SemiWide_validated==0:
     print('BIOLAB table join validated')
@@ -1852,7 +2038,8 @@ else:
 #* DATSCAN
 cols = ['CAUDATE_L','CAUDATE_R','PUTAMEN_L','PUTAMEN_R']
 c = Keys + cols
-df = df_DATSCAN.loc[df_DATSCAN.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_DATSCAN.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_DATSCAN.EVENT_ID.isin(EVENT_IDs)
+df = df_DATSCAN.loc[rowz.values,c].copy()
 (DATSCAN_validated,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if DATSCAN_validated==0:
     print('DATSCAN table join validated')
@@ -1866,7 +2053,8 @@ cols = ['NP3_TOT', 'NP3SPCH', 'NP3FACXP', 'NP3RIGN', 'NP3RIGRU',
        'NP3BRADY', 'NP3PTRMR', 'NP3PTRML', 'NP3KTRMR', 'NP3KTRML', 'NP3RTARU',
        'NP3RTALU', 'NP3RTARL', 'NP3RTALL', 'NP3RTALJ', 'NP3RTCON', 'NHY']
 c = keys + cols
-df = df_NUPDRS3A.loc[df_NUPDRS3A.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_NUPDRS3A.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_NUPDRS3A.EVENT_ID.isin(EVENT_IDs)
+df = df_NUPDRS3A.loc[rowz.values,c].copy()
 cols_ = [col.replace('PN3','NP3') for col in cols]
 df.rename(columns={'PN3RIGRL':'NP3RIGRL'},inplace=True)
 #* Add the suffix I used above
@@ -1878,7 +2066,8 @@ if NUPDRS3A_validated==0:
 else:
     print('NUPDRS3A table join failed validation')
 
-df = df_NUPDRS3.loc[df_NUPDRS3.PATNO.isin(df_RANDOM_enrolled.PATNO),c].copy()
+rowz = df_NUPDRS3.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_NUPDRS3.EVENT_ID.isin(EVENT_IDs)
+df = df_NUPDRS3.loc[rowz.values,c].copy()
 df.rename(columns={'PN3RIGRL':'NP3RIGRL'},inplace=True)
 (NUPDRS3_validated,NUPDRS3_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols_,keys)
 if NUPDRS3_validated==0:
@@ -1892,7 +2081,8 @@ cols = columns_of_interest[key][1:] # Removes INFODT
 c = ['PATNO','EVENT_ID'] + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (CLINDX_validated,CLINDX_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if CLINDX_validated==0:
     print('CLINDX table join validated')
@@ -1907,7 +2097,8 @@ if include_MRI_volumes:
     c = ['PATNO','EVENT_ID'] + cols
     n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
     df_ = PPMI_df[n][c]
-    df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+    rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+    df = df_.loc[rowz.values].copy()
     (MRI_validated,MRI_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
     if MRI_validated==0:
         print('MRI table join validated')
@@ -1917,10 +2108,12 @@ if include_MRI_volumes:
 #* Use of PD medication
 key = 'PDMEDUSE'
 cols = columns_of_interest[key]
+# cols.pop() # remove 'PAG_NAME'
 c = keys + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (PDMEDUSE_validated,PDMEDUSE_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if PDMEDUSE_validated==0:
     print('{0} table join validated'.format(key))
@@ -1939,7 +2132,8 @@ cols = [col for col in cols if col not in cols_to_remove]
 c = keys + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (PENEURO_validated,PENEURO_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if PENEURO_validated==0:
     print('{0} table join validated'.format(key))
@@ -1957,7 +2151,8 @@ cols = [col for col in cols if col not in cols_to_remove]
 c = keys + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (QUIPCS_validated,QUIPCS_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if QUIPCS_validated==0:
     print('{0} table join validated'.format(key))
@@ -1975,7 +2170,8 @@ cols = [col for col in cols if col not in cols_to_remove]
 c = keys + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (SCOPAAUT_validated,SCOPAAUT_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if SCOPAAUT_validated==0:
     print('{0} table join validated'.format(key))
@@ -1993,7 +2189,8 @@ cols = [col for col in cols if col not in cols_to_remove]
 c = keys + cols
 n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
 df_ = PPMI_df[n][c]
-df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
 (LINEORNT_validated,LINEORNT_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
 if LINEORNT_validated==0:
     print('{0} table join validated'.format(key))
@@ -2001,13 +2198,28 @@ else:
     print('{0} table join failed validation. Unmatched rows:'.format(key))
     print(LINEORNT_unmatched_rows)
 
+
+#* MOCA
+key = 'MOCA'
+cols = columns_of_interest[key]
+c = keys + cols
+n = np.where([1 if n.lower()==tables_of_interest[key].lower() else 0 for n in PPMI_df_names])[0][0]
+df_ = PPMI_df[n][c]
+rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+df = df_.loc[rowz.values].copy()
+(MOCA_validated,MOCA_unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
+if MOCA_validated==0:
+    print('{0} table join validated'.format(key))
+else:
+    print('{0} table join failed validation. Unmatched rows:'.format(key))
+    print(MOCA_unmatched_rows)
+
 # ## Validate the rest automatically using `tables_of_interest` and `columns_of_interest`
 dfs_of_interest = ['NUPDRS1','NUPDRS1p','NUPDRS2p','NUPDRS4',
                    'EPWORTH',
                    'GDSSHORT',
                    'HVLT',
                    'LNSPD',
-                   'MOCA',
                    'PECN',
                    'REMSLEEP',
                    'SDM',
@@ -2022,7 +2234,8 @@ for k in dfs_of_interest:
     n = np.where([1 if n.lower()==tables_of_interest[k].lower() else 0 for n in PPMI_df_names])[0][0]
     cols = columns_of_interest[k]
     df_ = PPMI_df[n][keys + cols]
-    df = df_.loc[df_.PATNO.isin(df_RANDOM_enrolled.PATNO)].copy()
+    rowz = df_.PATNO.isin(df_RANDOM_enrolled.PATNO) & df_.EVENT_ID.isin(EVENT_IDs)
+    df = df_.loc[rowz.values].copy()
     (v,unmatched_rows) = validate_PPMIMERGE(df_PPMIMERGE,df,cols,keys)
     if v==0:
         print('{0} table join validated'.format(k))
@@ -2055,6 +2268,7 @@ x = df_PPMIMERGE_.loc[boo,'MCATOT']
 x_PATNO = df_PPMIMERGE_.loc[boo,'PATNO']
 #* Identify SC and BL rows
 scbl = (df_PPMIMERGE_.EVENT_ID=='BL') | (df_PPMIMERGE_.EVENT_ID=='SC')
+scbl = scbl | (df_PPMIMERGE_.EVENT_ID=='SCBL')
 #* Pad selected columns: copy, fillna, reinsert
 c = columns_of_interest['MOCA'] + columns_of_interest['GDSSHORT'] \
     + columns_of_interest['DATSCAN_RESULTS'] \
@@ -2069,7 +2283,7 @@ dftmp = df_PPMIMERGE_.loc[scbl,Keys+c].sort_values(by=['PATNO','EVENT_ID'],ascen
 PATNO_u = np.unique(dftmp.PATNO)
 for P in PATNO_u:
     rowz = dftmp.PATNO == P
-    dftmp.loc[rowz,c] = dftmp.loc[rowz,c].fillna(method='ffill',axis=0)
+    dftmp.loc[rowz.values,c] = dftmp.loc[rowz.values,c].fillna(method='ffill',axis=0)
 
 #* Replace SC and BL rows with the fillna()-d data
 df_PPMIMERGE_.loc[dftmp.index,Keys+c] = dftmp
@@ -2107,16 +2321,22 @@ def fill_baseline(df,col='INFODT_'):
     rowz_sc = df.EVENT_ID=='SC'
     for PATNO in df['PATNO'].unique():
         rowz = df.PATNO==PATNO
-        if sum(rowz & rowz_bl)==1:
-            INFODT_bl = df.loc[rowz & rowz_bl,col]
-            df_out.loc[rowz,col+'bl'] = INFODT_bl.values
-        else:
+        if sum(rowz & rowz_bl)==0:
+            #* I think I already merged sc and bl, so this is relic code
             print('Bugger! PATNO = {0} has {1} bl rows. Searching for SC visit instead.'.format(PATNO,sum(rowz & rowz_bl)))
             if sum(rowz & rowz_sc)==1:
+                print('>> Found a sc visit')
                 INFODT_sc = df.loc[rowz & rowz_sc,col]
                 df_out.loc[rowz,col+'bl'] = INFODT_sc.values
             else:
-                print('Bugger! PATNO = {0}; {1}/{2} bl/sc rows'.format(PATNO,sum(rowz & rowz_bl),sum(rowz & rowz_sc)))
+                print('>> Did not find a single sc visit for PATNO = {0}; {1}/{2} bl/sc rows'.format(PATNO,sum(rowz & rowz_bl),sum(rowz & rowz_sc)))
+        elif sum(rowz & rowz_bl)==1:
+            INFODT_bl = df.loc[rowz & rowz_bl,col]
+            df_out.loc[rowz,col+'bl'] = INFODT_bl.values[0]
+        else:
+            print('Bugger! PATNO = {0} has {1} bl rows. Using first available.'.format(PATNO,sum(rowz & rowz_bl)))
+            INFODTs_bl = df.loc[rowz & rowz_bl,col]
+            df_out.loc[rowz,col+'bl'] = INFODTs_bl.values[0]
     return df_out
 
 df_PPMIMERGE___ = fill_baseline(df_PPMIMERGE__,col='INFODT_')
@@ -2127,10 +2347,11 @@ def calculate_years_bl(df,infodt_col='INFODT_',infodt_bl_col='INFODT_bl'):
     visit_dt = pd.to_datetime(df[infodt_col])
     visit_dt_bl = pd.to_datetime(df[infodt_bl_col])
     delt = visit_dt - visit_dt_bl
-    return delt
+    delt_in_years = delt.dt.days/daysInAYear
+    return delt_in_years
 #* Keep three decimal places: PPMI dates are only precise to within one month = 0.083 years
 print('Calculating years since baseline')
-df_PPMIMERGE___['Years_bl'] = calculate_years_bl(df_PPMIMERGE___).apply(lambda x: round(x.days/daysInAYear,3))
+df_PPMIMERGE___['Years_bl'] = calculate_years_bl(df_PPMIMERGE___).apply(lambda x: round(x,3))
 
 #* Age
 Age = df_PPMIMERGE___['INFODT_'] - pd.to_datetime(df_PPMIMERGE___['BIRTHDT'])
